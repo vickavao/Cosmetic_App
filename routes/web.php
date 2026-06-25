@@ -124,13 +124,14 @@ Route::middleware('auth')->group(function () {
 
     Route::resource('products', ProductController::class);
     Route::resource('clients', ClientController::class);
-    Route::resource('orders', OrderController::class)->except(['edit', 'update']);
 
     Route::middleware('role:chef_marketing|admin')->group(function () {
         Route::get('/orders/pending', [OrderController::class, 'pendingValidation'])->name('orders.pending');
         Route::patch('/orders/{order}/validate', [OrderController::class, 'validateOrder'])->name('orders.validate');
         Route::patch('/orders/{order}/reject', [OrderController::class, 'rejectOrder'])->name('orders.reject');
     });
+
+    Route::resource('orders', OrderController::class)->except(['edit', 'update']);
 
     /*
     |--------------------------------------------------------------------------
