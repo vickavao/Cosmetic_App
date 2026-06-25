@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\Role;
+use App\Models\Client;
 use App\Models\User;
 use Spatie\Permission\Models\Role as SpatieRole;
 
@@ -31,7 +32,7 @@ it('allows the chef marketing to access goods issue creation', function () {
         ->assertOk();
 });
 
-it('rejects creating a terrain agent without a magasin', function () {
+it('rejects creating a terrain agent without a client_id', function () {
     $agent = rbacUserWithRole(Role::AgentMarketeur);
 
     $this->actingAs($agent)
@@ -41,17 +42,18 @@ it('rejects creating a terrain agent without a magasin', function () {
             'password' => 'password123',
             'password_confirmation' => 'password123',
         ])
-        ->assertSessionHasErrors('magasin');
+        ->assertSessionHasErrors('client_id');
 });
 
-it('creates a terrain agent when a magasin is provided', function () {
+it('creates a terrain agent when a client_id is provided', function () {
     $agent = rbacUserWithRole(Role::AgentMarketeur);
+    $client = Client::factory()->create(['agent_id' => $agent->id]);
 
     $this->actingAs($agent)
         ->post(route('agents.store'), [
             'name' => 'Terrain Avec Magasin',
             'email' => 'terrain2@example.com',
-            'magasin' => 'Boutique Centre',
+            'client_id' => $client->id,
             'password' => 'password123',
             'password_confirmation' => 'password123',
         ])
@@ -59,7 +61,7 @@ it('creates a terrain agent when a magasin is provided', function () {
 
     $this->assertDatabaseHas('users', [
         'email' => 'terrain2@example.com',
-        'magasin' => 'Boutique Centre',
+        'client_id' => $client->id,
     ]);
 });
 

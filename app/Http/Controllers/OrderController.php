@@ -87,7 +87,17 @@ class OrderController extends Controller
 
             $total = 0;
 
+            $merged = [];
             foreach ($data['items'] as $line) {
+                $pid = $line['product_id'];
+                if (isset($merged[$pid])) {
+                    $merged[$pid]['quantite'] += $line['quantite'];
+                } else {
+                    $merged[$pid] = $line;
+                }
+            }
+
+            foreach ($merged as $line) {
                 $product = Product::findOrFail($line['product_id']);
                 $sousTotal = $product->price * $line['quantite'];
                 $total += $sousTotal;
@@ -272,6 +282,28 @@ class OrderController extends Controller
         }
 
         return back()->with('status', 'Commande refusée.');
+    }
+
+    /**
+     * Dedicated page for Chef Marketing: all pending orders with filters.
+     */
+    public function pendingValidation(Request $request): View
+    {
+        $orders = Order::query()
+            ->enAttente()
+            ->when($request->filled('client_id'), fn ($q) => $q->where('client_id', $request->integer('client_id')))
+            ->when($request->filled('agent_id'), fn ($q) => $q->where('user_id', $request->integer('agent_id')))
+            ->when($request->filled('date_from'), fn ($q) => $q->whereDate('date_commande', '>=', $request->date('date_from')))
+            ->when($request->filled('date_to'), fn ($q) => $q->whereDate('date_commande', '<=', $request->date('date_to')))
+            ->with(['client', 'user', 'items.product'])
+            ->latest('date_commande')
+            ->paginate(20);
+
+        return view('orders.pending', [
+            'orders' => $orders,
+            'clients' => Client::query()->orderBy('name')->get(),
+            'agents' => User::query()->where('role', Role::AgentMarketeur->value)->where('is_active', true)->orderBy('name')->get(),
+        ]);
     }
 
     public function destroy(Order $order): RedirectResponse

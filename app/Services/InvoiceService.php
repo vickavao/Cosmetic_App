@@ -35,7 +35,17 @@ class InvoiceService
 
             $montant = 0.0;
 
+            $merged = [];
             foreach ($items as $line) {
+                $pid = $line['product_id'];
+                if (isset($merged[$pid])) {
+                    $merged[$pid]['quantite'] += (int) $line['quantite'];
+                } else {
+                    $merged[$pid] = $line;
+                }
+            }
+
+            foreach ($merged as $line) {
                 $product = Product::findOrFail($line['product_id']);
                 $sousTotal = (float) $product->price * (int) $line['quantite'];
                 $montant += $sousTotal;

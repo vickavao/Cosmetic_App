@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\Role;
+use App\Models\Client;
 use App\Models\User;
 use Spatie\Permission\Models\Role as SpatieRole;
 
@@ -16,7 +17,7 @@ function supervisorAgent(): User
     return $agent;
 }
 
-it('requires a magasin when creating a terrain agent', function () {
+it('requires a client_id when creating a terrain agent', function () {
     $agent = supervisorAgent();
 
     $this->actingAs($agent)
@@ -27,24 +28,25 @@ it('requires a magasin when creating a terrain agent', function () {
             'password' => 'password123',
             'password_confirmation' => 'password123',
         ])
-        ->assertSessionHasErrors('magasin');
+        ->assertSessionHasErrors('client_id');
 });
 
-it('creates an active terrain agent when a magasin is provided', function () {
+it('creates an active terrain agent when a client_id is provided', function () {
     $agent = supervisorAgent();
+    $client = Client::factory()->create(['agent_id' => $agent->id]);
 
     $this->actingAs($agent)
         ->post(route('agents.store'), [
             'name' => 'Jean Terrain',
             'email' => 'jean@example.com',
-            'magasin' => 'Boutique Centre',
+            'client_id' => $client->id,
             'password' => 'password123',
             'password_confirmation' => 'password123',
         ])
         ->assertRedirect(route('terrain.team'));
 
     $created = User::where('email', 'jean@example.com')->first();
-    expect($created->magasin)->toBe('Boutique Centre');
+    expect($created->client_id)->toBe($client->id);
     expect($created->is_active)->toBeTrue();
 });
 

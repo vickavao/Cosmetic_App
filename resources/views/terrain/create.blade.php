@@ -6,11 +6,10 @@
 @php
     $supervisorName = auth()->user()->supervisor?->name ?? 'N+1';
     $productsJson = $products->map(fn ($p) => ['id' => $p->id, 'name' => $p->name, 'price' => (float) $p->price])->values();
-    $clientsJson = $clients->map(fn ($c) => ['id' => $c->id, 'label' => $c->name.($c->ville ? ' — '.$c->ville : '')])->values();
 @endphp
 
     <div class="max-w-2xl mx-auto space-y-6"
-         x-data="terrainForm({{ $productsJson->toJson() }}, {{ $clientsJson->toJson() }})">
+         x-data="terrainForm({{ $productsJson->toJson() }})">
         <div class="flex items-center justify-between">
             <h1 class="text-2xl font-bold text-gray-900">Rapport du {{ now()->format('d/m/Y') }}</h1>
             <a href="{{ route('terrain.index') }}" class="btn-secondary">Retour</a>
@@ -38,21 +37,12 @@
                 <div class="space-y-3">
                     <template x-for="(line, index) in lines" :key="index">
                         <div class="grid grid-cols-12 gap-2 items-end rounded-lg border border-gray-200 p-3">
-                            <div class="col-span-6">
+                            <div class="col-span-12">
                                 <label class="text-xs text-gray-500">Produit</label>
                                 <select class="form-input !py-2" :name="`items[${index}][product_id]`" x-model.number="line.product_id" @change="onProduct(index)" required>
                                     <option value="">Sélectionner</option>
                                     <template x-for="p in products" :key="p.id">
                                         <option :value="p.id" x-text="p.name"></option>
-                                    </template>
-                                </select>
-                            </div>
-                            <div class="col-span-6">
-                                <label class="text-xs text-gray-500">Client</label>
-                                <select class="form-input !py-2" :name="`items[${index}][client_id]`" x-model.number="line.client_id">
-                                    <option value="">— Non précisé —</option>
-                                    <template x-for="c in clients" :key="c.id">
-                                        <option :value="c.id" x-text="c.label"></option>
                                     </template>
                                 </select>
                             </div>
@@ -88,17 +78,26 @@
     </div>
 
     <script>
-        function terrainForm(products, clients) {
+        function terrainForm(products) {
             return {
                 products,
-                clients,
-                lines: [{ product_id: '', client_id: '', quantite: 1, prix_unitaire: 0 }],
-                addLine() { this.lines.push({ product_id: '', client_id: '', quantite: 1, prix_unitaire: 0 }); },
+                lines: [{ product_id: '', quantite: 1, prix_unitaire: 0 }],
+                addLine() { this.lines.push({ product_id: '', quantite: 1, prix_unitaire: 0 }); },
                 removeLine(i) { this.lines.splice(i, 1); },
                 onProduct(i) {
                     const p = this.products.find(p => p.id === this.lines[i].product_id);
                     if (p && (!this.lines[i].prix_unitaire || this.lines[i].prix_unitaire === 0)) {
                         this.lines[i].prix_unitaire = p.price;
+                    }
+                    this.mergeDuplicate(i);
+                },
+                mergeDuplicate(index) {
+                    const line = this.lines[index];
+                    if (!line.product_id) return;
+                    const existing = this.lines.findIndex((l, i) => i !== index && l.product_id === line.product_id && l.prix_unitaire === line.prix_unitaire);
+                    if (existing !== -1) {
+                        this.lines[existing].quantite += (line.quantite || 1);
+                        this.lines.splice(index, 1);
                     }
                 },
                 lineTotal(line) { return (line.prix_unitaire || 0) * (line.quantite || 0); },

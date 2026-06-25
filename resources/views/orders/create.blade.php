@@ -71,7 +71,7 @@
                         <div class="grid grid-cols-12 gap-3 px-6 py-4 items-end">
                             <div class="col-span-6">
                                 <label class="form-label">Produit</label>
-                                <select class="form-input" :name="`items[${index}][product_id]`" x-model.number="line.product_id" required>
+                                <select class="form-input" :name="`items[${index}][product_id]`" x-model.number="line.product_id" @change="onProductChange(index)" required>
                                     <option value="">Sélectionner</option>
                                     <template x-for="p in products" :key="p.id">
                                         <option :value="p.id" x-text="`${p.name} ($${p.price.toFixed(2)}) — stock: ${p.stock}`"></option>
@@ -133,6 +133,15 @@
                 stockOf(id) { const p = this.products.find(p => p.id === id); return p ? p.stock : 0; },
                 lineTotal(line) { return this.priceOf(line.product_id) * (line.quantite || 0); },
                 total() { return this.lines.reduce((s, l) => s + this.lineTotal(l), 0); },
+                onProductChange(index) {
+                    const line = this.lines[index];
+                    if (!line.product_id) return;
+                    const existing = this.lines.findIndex((l, i) => i !== index && l.product_id === line.product_id);
+                    if (existing !== -1) {
+                        this.lines[existing].quantite += (line.quantite || 1);
+                        this.lines.splice(index, 1);
+                    }
+                },
             };
         }
     </script>

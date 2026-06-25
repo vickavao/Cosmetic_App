@@ -127,6 +127,7 @@ Route::middleware('auth')->group(function () {
     Route::resource('orders', OrderController::class)->except(['edit', 'update']);
 
     Route::middleware('role:chef_marketing|admin')->group(function () {
+        Route::get('/orders/pending', [OrderController::class, 'pendingValidation'])->name('orders.pending');
         Route::patch('/orders/{order}/validate', [OrderController::class, 'validateOrder'])->name('orders.validate');
         Route::patch('/orders/{order}/reject', [OrderController::class, 'rejectOrder'])->name('orders.reject');
     });
@@ -214,6 +215,7 @@ Route::middleware('auth')->group(function () {
     Route::middleware('role:client')->prefix('mon-espace')->group(function () {
         Route::get('/', [ClientPortalController::class, 'dashboard'])->name('portal.dashboard');
         Route::get('/commandes', [ClientPortalController::class, 'orders'])->name('portal.orders');
+        Route::get('/factures', [ClientPortalController::class, 'invoices'])->name('portal.invoices');
         Route::get('/catalogue', [ClientPortalController::class, 'catalogue'])->name('portal.catalogue');
         Route::get('/offres', [ClientPortalController::class, 'offers'])->name('portal.offers');
         Route::get('/mon-marketeur', [ClientPortalController::class, 'marketeur'])->name('portal.marketeur');

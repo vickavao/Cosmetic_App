@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\Role;
+use App\Models\Client;
 use App\Models\User;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
@@ -14,8 +15,17 @@ class AgentController extends Controller
 {
     public function create(Request $request): View
     {
+        $creator = $request->user();
+        $role = $this->subordinateRoleFor($creator);
+
+        $clients = collect();
+        if ($role === Role::MarketeurTerrain) {
+            $clients = $creator->managedClients()->orderBy('name')->get();
+        }
+
         return view('agents.create', [
-            'subordinateRole' => $this->subordinateRoleFor($request->user()),
+            'subordinateRole' => $role,
+            'clients' => $clients,
         ]);
     }
 
@@ -24,33 +34,38 @@ class AgentController extends Controller
         $creator = $request->user();
         $role = $this->subordinateRoleFor($creator);
 
-        $magasinRule = $role === Role::MarketeurTerrain
-            ? ['required', 'string', 'max:255']
-            : ['nullable', 'string', 'max:255'];
-
-        $data = $request->validate([
+        $rules = [
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'phone' => ['nullable', 'string', 'max:30'],
-            'magasin' => $magasinRule,
             'password' => ['required', 'confirmed', Password::defaults()],
-        ], [
-            'magasin.required' => 'Un Marketeur Terrain doit obligatoirement être associé à un magasin.',
-        ]);
+        ];
 
-        $magasin = $role === Role::MarketeurTerrain ? ($data['magasin'] ?? null) : null;
+        $messages = [];
 
-        // Un Marketeur Terrain sans magasin assigné est désactivé par défaut.
-        $isActive = $request->boolean('is_active', true);
-        if ($role === Role::MarketeurTerrain && blank($magasin)) {
-            $isActive = false;
+        if ($role === Role::MarketeurTerrain) {
+            $rules['client_id'] = ['required', 'integer', 'exists:clients,id'];
+            $messages['client_id.required'] = 'Vous devez affecter le Marketeur Terrain à un magasin client.';
         }
+
+        $data = $request->validate($rules, $messages);
+
+        $clientId = null;
+        $magasin = null;
+        if ($role === Role::MarketeurTerrain && isset($data['client_id'])) {
+            $client = Client::find($data['client_id']);
+            $clientId = $client->id;
+            $magasin = $client->name;
+        }
+
+        $isActive = $request->boolean('is_active', true);
 
         $agent = User::create([
             'name' => $data['name'],
             'email' => $data['email'],
             'phone' => $data['phone'] ?? null,
             'magasin' => $magasin,
+            'client_id' => $clientId,
             'password' => Hash::make($data['password']),
             'role' => $role,
             'supervisor_id' => $creator->id,
