@@ -8,6 +8,7 @@ use App\Enums\SaleType;
 use App\Models\Delivery;
 use App\Models\Order;
 use App\Services\DeliveryService;
+use App\Services\InvoiceService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -16,7 +17,10 @@ use RuntimeException;
 
 class DeliveryController extends Controller
 {
-    public function __construct(private DeliveryService $deliveryService) {}
+    public function __construct(
+        private DeliveryService $deliveryService,
+        private InvoiceService $invoiceService,
+    ) {}
 
     public function index(Request $request): View
     {
@@ -37,14 +41,14 @@ class DeliveryController extends Controller
     }
 
     /**
-     * Show the form to create a delivery from a validated order.
+     * Show the form to create a delivery from a prepared order (prête à livraison).
      */
     public function create(Request $request): View
     {
         Gate::authorize('create', Delivery::class);
 
         $orders = Order::query()
-            ->where('statut', OrderStatus::Validee->value)
+            ->where('statut', OrderStatus::PreteALivraison->value)
             ->when(
                 $request->user()->role === Role::AgentMarketeur,
                 fn ($q) => $q->where('user_id', $request->user()->id)
@@ -62,16 +66,19 @@ class DeliveryController extends Controller
 
         $data = $request->validate([
             'order_id' => ['required', 'integer', 'exists:orders,id'],
-            'type_vente' => ['required', 'in:'.implode(',', SaleType::values())],
         ]);
 
-        $order = Order::findOrFail($data['order_id']);
+        $order = Order::with(['client', 'items.product', 'user'])->findOrFail($data['order_id']);
+
+        if ($order->statut !== OrderStatus::PreteALivraison) {
+            return back()->with('warning', 'Seule une commande prête à livraison peut être livrée.');
+        }
 
         try {
             $delivery = $this->deliveryService->createFromOrder(
                 $order,
-                SaleType::from($data['type_vente']),
-                agentId: null,
+                $order->type_vente ?? SaleType::Comptant,
+                agentId: $request->user()->id,
                 createdBy: $request->user()->id,
             );
         } catch (RuntimeException $e) {
@@ -80,7 +87,7 @@ class DeliveryController extends Controller
 
         return redirect()
             ->route('deliveries.show', $delivery)
-            ->with('status', 'Bon de livraison créé. Confirmez la livraison pour déduire le stock.');
+            ->with('status', 'Livraison effectuée et facture générée automatiquement.');
     }
 
     public function show(Delivery $delivery): View

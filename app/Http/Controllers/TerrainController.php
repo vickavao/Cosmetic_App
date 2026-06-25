@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Enums\OrderStatus;
 use App\Enums\Role;
 use App\Http\Requests\StoreTerrainReportRequest;
-use App\Models\Client;
 use App\Models\Product;
 use App\Models\TerrainReport;
 use App\Models\User;
@@ -39,7 +38,6 @@ class TerrainController extends Controller
 
         return view('terrain.create', [
             'products' => Product::query()->where('is_active', true)->orderBy('name')->get(),
-            'clients' => Client::query()->orderBy('name')->get(),
         ]);
     }
 
@@ -58,13 +56,23 @@ class TerrainController extends Controller
                 'nb_ventes' => 0,
             ]);
 
+            $merged = [];
             foreach ($items as $line) {
+                $key = $line['product_id'].'-'.$line['prix_unitaire'];
+                if (isset($merged[$key])) {
+                    $merged[$key]['quantite'] += (int) $line['quantite'];
+                } else {
+                    $merged[$key] = $line;
+                }
+            }
+
+            foreach ($merged as $line) {
                 $sousTotal = (float) $line['prix_unitaire'] * (int) $line['quantite'];
                 $totalQuantite += (int) $line['quantite'];
 
                 $report->items()->create([
                     'product_id' => $line['product_id'],
-                    'client_id' => $line['client_id'] ?? null,
+                    'client_id' => $user->client_id,
                     'quantite' => $line['quantite'],
                     'prix_unitaire' => $line['prix_unitaire'],
                     'sous_total' => $sousTotal,

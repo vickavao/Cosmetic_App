@@ -97,6 +97,16 @@
                 onProduct(i) {
                     const p = this.products.find(p => p.id === this.lines[i].product_id);
                     this.lines[i].price = p ? p.price : 0;
+                    this.mergeDuplicate(i);
+                },
+                mergeDuplicate(index) {
+                    const line = this.lines[index];
+                    if (!line.product_id) return;
+                    const existing = this.lines.findIndex((l, i) => i !== index && l.product_id === line.product_id && l.price === line.price);
+                    if (existing !== -1) {
+                        this.lines[existing].quantite += (line.quantite || 1);
+                        this.lines.splice(index, 1);
+                    }
                 },
                 lineTotal(line) { return (line.price || 0) * (line.quantite || 0); },
                 total() { return this.lines.reduce((s, l) => s + this.lineTotal(l), 0); },

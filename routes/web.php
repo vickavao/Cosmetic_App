@@ -7,6 +7,7 @@ use App\Http\Controllers\ConversionRateController;
 use App\Http\Controllers\DailyClosureController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DeliveryController;
+use App\Http\Controllers\GoodsIssueNoteController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\MessageController;
 use App\Http\Controllers\OfferController;
@@ -123,31 +124,41 @@ Route::middleware('auth')->group(function () {
 
     Route::resource('products', ProductController::class);
     Route::resource('clients', ClientController::class);
-    Route::resource('orders', OrderController::class)->except(['edit', 'update']);
 
     Route::middleware('role:chef_marketing|admin')->group(function () {
+        Route::get('/orders/pending', [OrderController::class, 'pendingValidation'])->name('orders.pending');
         Route::patch('/orders/{order}/validate', [OrderController::class, 'validateOrder'])->name('orders.validate');
         Route::patch('/orders/{order}/reject', [OrderController::class, 'rejectOrder'])->name('orders.reject');
     });
 
+    Route::resource('orders', OrderController::class)->except(['edit', 'update']);
+
     /*
     |--------------------------------------------------------------------------
-    | Livraisons (bons de livraison) & bons de sortie
+    | Bon de Sortie (Magasinier) — Étape 3 du flux CDC V2
     |--------------------------------------------------------------------------
     */
-    // Seul le Chef Marketing (et l'Admin) émet le bon de sortie à partir d'une commande validée.
-    // Déclaré avant la route wildcard {delivery} pour éviter toute collision sur "create".
-    Route::middleware('role:admin|chef_marketing')->group(function () {
+    Route::middleware('role:magasinier|admin')->group(function () {
+        Route::get('/goods-issue-notes/create', [GoodsIssueNoteController::class, 'create'])->name('goods-issue-notes.create');
+        Route::post('/goods-issue-notes', [GoodsIssueNoteController::class, 'store'])->name('goods-issue-notes.store');
+    });
+
+    Route::middleware('role:admin|directeur|chef_marketing|agent_marketeur|magasinier')->group(function () {
+        Route::get('/goods-issue-notes/{goodsIssueNote}', [GoodsIssueNoteController::class, 'show'])->name('goods-issue-notes.show');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Livraisons (bons de livraison) — Étape 4 du flux CDC V2
+    |--------------------------------------------------------------------------
+    */
+    // L'Agent Marketeur N2 crée la livraison + facture auto-générée.
+    Route::middleware('role:agent_marketeur|chef_marketing|admin')->group(function () {
         Route::get('/deliveries/create', [DeliveryController::class, 'create'])->name('deliveries.create');
         Route::post('/deliveries', [DeliveryController::class, 'store'])->name('deliveries.store');
     });
 
-    // La sortie physique est confirmée par le Magasinier (Chef Marketing / Admin en secours).
-    Route::middleware('role:magasinier|chef_marketing|admin')->group(function () {
-        Route::patch('/deliveries/{delivery}/confirm', [DeliveryController::class, 'confirm'])->name('deliveries.confirm');
-    });
-
-    // Consultation des bons de livraison/sortie (l'Agent Marketeur est en lecture seule).
+    // Consultation des bons de livraison.
     Route::middleware('role:admin|directeur|chef_marketing|agent_marketeur|magasinier')->group(function () {
         Route::get('/deliveries', [DeliveryController::class, 'index'])->name('deliveries.index');
         Route::get('/deliveries/{delivery}', [DeliveryController::class, 'show'])->name('deliveries.show');
@@ -205,6 +216,7 @@ Route::middleware('auth')->group(function () {
     Route::middleware('role:client')->prefix('mon-espace')->group(function () {
         Route::get('/', [ClientPortalController::class, 'dashboard'])->name('portal.dashboard');
         Route::get('/commandes', [ClientPortalController::class, 'orders'])->name('portal.orders');
+        Route::get('/factures', [ClientPortalController::class, 'invoices'])->name('portal.invoices');
         Route::get('/catalogue', [ClientPortalController::class, 'catalogue'])->name('portal.catalogue');
         Route::get('/offres', [ClientPortalController::class, 'offers'])->name('portal.offers');
         Route::get('/mon-marketeur', [ClientPortalController::class, 'marketeur'])->name('portal.marketeur');

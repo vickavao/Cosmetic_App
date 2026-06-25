@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\Role;
+use App\Models\Client;
 use App\Models\User;
 use Spatie\Permission\Models\Role as SpatieRole;
 
@@ -15,12 +16,12 @@ function rbacUserWithRole(Role $role): User
     return $user;
 }
 
-it('forbids an agent marketeur from creating a goods issue (bon de sortie)', function () {
+it('allows an agent marketeur to access delivery creation (CDC V2 step 4)', function () {
     $agent = rbacUserWithRole(Role::AgentMarketeur);
 
     $this->actingAs($agent)
         ->get(route('deliveries.create'))
-        ->assertForbidden();
+        ->assertOk();
 });
 
 it('allows the chef marketing to access goods issue creation', function () {
@@ -31,7 +32,7 @@ it('allows the chef marketing to access goods issue creation', function () {
         ->assertOk();
 });
 
-it('rejects creating a terrain agent without a magasin', function () {
+it('rejects creating a terrain agent without a client_id', function () {
     $agent = rbacUserWithRole(Role::AgentMarketeur);
 
     $this->actingAs($agent)
@@ -41,17 +42,18 @@ it('rejects creating a terrain agent without a magasin', function () {
             'password' => 'password123',
             'password_confirmation' => 'password123',
         ])
-        ->assertSessionHasErrors('magasin');
+        ->assertSessionHasErrors('client_id');
 });
 
-it('creates a terrain agent when a magasin is provided', function () {
+it('creates a terrain agent when a client_id is provided', function () {
     $agent = rbacUserWithRole(Role::AgentMarketeur);
+    $client = Client::factory()->create(['agent_id' => $agent->id]);
 
     $this->actingAs($agent)
         ->post(route('agents.store'), [
             'name' => 'Terrain Avec Magasin',
             'email' => 'terrain2@example.com',
-            'magasin' => 'Boutique Centre',
+            'client_id' => $client->id,
             'password' => 'password123',
             'password_confirmation' => 'password123',
         ])
@@ -59,6 +61,14 @@ it('creates a terrain agent when a magasin is provided', function () {
 
     $this->assertDatabaseHas('users', [
         'email' => 'terrain2@example.com',
-        'magasin' => 'Boutique Centre',
+        'client_id' => $client->id,
     ]);
+});
+
+it('blocks a terrain agent from creating orders (CDC V2 rule)', function () {
+    $terrain = rbacUserWithRole(Role::MarketeurTerrain);
+
+    $this->actingAs($terrain)
+        ->get(route('orders.create'))
+        ->assertForbidden();
 });

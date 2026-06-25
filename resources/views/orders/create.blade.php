@@ -26,7 +26,8 @@
             </div>
         @endif
 
-        <form method="POST" action="{{ route('orders.store') }}" class="space-y-6">
+        <form method="POST" action="{{ route('orders.store') }}" class="space-y-6"
+              x-data="{ typeVente: '{{ old('type_vente', 'comptant') }}' }">
             @csrf
 
             <div class="card grid grid-cols-1 sm:grid-cols-2 gap-5">
@@ -43,6 +44,20 @@
                     <label class="form-label" for="date_commande">Date de commande</label>
                     <input id="date_commande" type="date" name="date_commande" value="{{ old('date_commande', now()->toDateString()) }}" class="form-input">
                 </div>
+                <div>
+                    <label class="form-label" for="type_vente">Type de vente</label>
+                    <select id="type_vente" name="type_vente" class="form-input" required x-model="typeVente">
+                        <option value="comptant">Au comptant</option>
+                        <option value="credit">À crédit</option>
+                    </select>
+                    @error('type_vente') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                </div>
+                <div x-show="typeVente === 'credit'" x-cloak>
+                    <label class="form-label" for="date_echeance">Date d'échéance</label>
+                    <input id="date_echeance" type="date" name="date_echeance" value="{{ old('date_echeance') }}" class="form-input"
+                           :required="typeVente === 'credit'" min="{{ now()->addDay()->toDateString() }}">
+                    @error('date_echeance') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                </div>
             </div>
 
             <div class="card p-0 overflow-hidden">
@@ -56,7 +71,7 @@
                         <div class="grid grid-cols-12 gap-3 px-6 py-4 items-end">
                             <div class="col-span-6">
                                 <label class="form-label">Produit</label>
-                                <select class="form-input" :name="`items[${index}][product_id]`" x-model.number="line.product_id" required>
+                                <select class="form-input" :name="`items[${index}][product_id]`" x-model.number="line.product_id" @change="onProductChange(index)" required>
                                     <option value="">Sélectionner</option>
                                     <template x-for="p in products" :key="p.id">
                                         <option :value="p.id" x-text="`${p.name} ($${p.price.toFixed(2)}) — stock: ${p.stock}`"></option>
@@ -118,6 +133,15 @@
                 stockOf(id) { const p = this.products.find(p => p.id === id); return p ? p.stock : 0; },
                 lineTotal(line) { return this.priceOf(line.product_id) * (line.quantite || 0); },
                 total() { return this.lines.reduce((s, l) => s + this.lineTotal(l), 0); },
+                onProductChange(index) {
+                    const line = this.lines[index];
+                    if (!line.product_id) return;
+                    const existing = this.lines.findIndex((l, i) => i !== index && l.product_id === line.product_id);
+                    if (existing !== -1) {
+                        this.lines[existing].quantite += (line.quantite || 1);
+                        this.lines.splice(index, 1);
+                    }
+                },
             };
         }
     </script>

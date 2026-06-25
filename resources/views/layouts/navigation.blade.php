@@ -15,7 +15,8 @@
         \App\Enums\Role::ChefMarketing => [
             ['route' => 'dashboard', 'label' => 'Dashboard', 'icon' => $icons['dashboard']],
             ['route' => 'terrain.team', 'label' => 'Mon Équipe', 'icon' => $icons['team']],
-            ['route' => 'orders.index', 'label' => 'Commandes à Valider', 'icon' => $icons['orders']],
+            ['route' => 'orders.pending', 'label' => 'Commandes à Valider', 'icon' => $icons['orders']],
+            ['route' => 'orders.index', 'label' => 'Toutes les Commandes', 'icon' => $icons['orders']],
             ['route' => 'deliveries.index', 'label' => 'Livraisons', 'icon' => $icons['deliveries']],
             ['route' => 'reports.terrain', 'label' => 'Rapports terrain', 'icon' => $icons['report']],
             ['route' => 'offers.index', 'label' => 'Offres', 'icon' => $icons['products']],
@@ -58,6 +59,7 @@
         \App\Enums\Role::Client => [
             ['route' => 'portal.dashboard', 'label' => 'Tableau de bord', 'icon' => $icons['dashboard']],
             ['route' => 'portal.orders', 'label' => 'Mes Commandes', 'icon' => $icons['orders']],
+            ['route' => 'portal.invoices', 'label' => 'Mes Factures', 'icon' => $icons['report']],
             ['route' => 'portal.catalogue', 'label' => 'Catalogue', 'icon' => $icons['products']],
             ['route' => 'portal.offers', 'label' => 'Offres', 'icon' => $icons['report']],
             ['route' => 'portal.marketeur', 'label' => 'Mon Marketeur', 'icon' => $icons['clients']],

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\OrderStatus;
 use App\Models\Client;
+use App\Models\Invoice;
 use App\Models\Message;
 use App\Models\Offer;
 use App\Models\Order;
@@ -25,6 +26,8 @@ class ClientPortalController extends Controller
 
         $baseQuery = Order::query()->where('client_id', $client->id);
 
+        $invoiceQuery = Invoice::query()->where('client_id', $client->id);
+
         $kpis = [
             'total_commandes' => (clone $baseQuery)->count(),
             'en_cours' => (clone $baseQuery)->whereIn('statut', [
@@ -33,6 +36,7 @@ class ClientPortalController extends Controller
                 OrderStatus::PreteALivraison->value,
             ])->count(),
             'livrees' => (clone $baseQuery)->where('statut', OrderStatus::Livree->value)->count(),
+            'factures_impayees' => (clone $invoiceQuery)->credit()->count(),
             'offres_actives' => Offer::query()->active()->count(),
         ];
 
@@ -139,6 +143,25 @@ class ClientPortalController extends Controller
         return view('portal.orders', [
             'client' => $client,
             'orders' => $orders,
+        ]);
+    }
+
+    /**
+     * View invoices + due-date alerts (J-3, J-2, J-1).
+     */
+    public function invoices(Request $request): View
+    {
+        $client = $this->resolveClient($request);
+
+        $invoices = Invoice::query()
+            ->where('client_id', $client->id)
+            ->with('lines')
+            ->latest('date')
+            ->paginate(15);
+
+        return view('portal.invoices', [
+            'client' => $client,
+            'invoices' => $invoices,
         ]);
     }
 

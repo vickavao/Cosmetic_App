@@ -16,9 +16,9 @@ class InvoiceService
      *
      * @param  array<int, array{product_id:int, quantite:int}>  $items
      */
-    public function create(int $clientId, int $agentId, SaleType $typeVente, array $items, ?string $notes = null, ?int $orderId = null): Invoice
+    public function create(int $clientId, int $agentId, SaleType $typeVente, array $items, ?string $notes = null, ?int $orderId = null, mixed $dateEcheance = null): Invoice
     {
-        return DB::transaction(function () use ($clientId, $agentId, $typeVente, $items, $notes, $orderId): Invoice {
+        return DB::transaction(function () use ($clientId, $agentId, $typeVente, $items, $notes, $orderId, $dateEcheance): Invoice {
             $invoice = Invoice::create([
                 'reference' => 'FAC-'.strtoupper(Str::random(8)),
                 'client_id' => $clientId,
@@ -26,6 +26,7 @@ class InvoiceService
                 'order_id' => $orderId,
                 'statut' => InvoiceStatus::Emise,
                 'type_vente' => $typeVente,
+                'date_echeance' => $dateEcheance,
                 'montant' => 0,
                 'montant_paye' => 0,
                 'date' => today(),
@@ -34,7 +35,17 @@ class InvoiceService
 
             $montant = 0.0;
 
+            $merged = [];
             foreach ($items as $line) {
+                $pid = $line['product_id'];
+                if (isset($merged[$pid])) {
+                    $merged[$pid]['quantite'] += (int) $line['quantite'];
+                } else {
+                    $merged[$pid] = $line;
+                }
+            }
+
+            foreach ($merged as $line) {
                 $product = Product::findOrFail($line['product_id']);
                 $sousTotal = (float) $product->price * (int) $line['quantite'];
                 $montant += $sousTotal;

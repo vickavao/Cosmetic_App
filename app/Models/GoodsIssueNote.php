@@ -11,6 +11,7 @@ class GoodsIssueNote extends Model
     protected $fillable = [
         'reference',
         'delivery_id',
+        'order_id',
         'issued_by',
         'date',
         'motif',
@@ -34,6 +35,11 @@ class GoodsIssueNote extends Model
     public function issuer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'issued_by');
+    }
+
+    public function order(): BelongsTo
+    {
+        return $this->belongsTo(Order::class);
     }
 
     public function lines(): HasMany

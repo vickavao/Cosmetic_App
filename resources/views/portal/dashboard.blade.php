@@ -9,7 +9,7 @@
         </div>
 
         {{-- KPIs --}}
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
             <div class="card">
                 <p class="text-xs uppercase text-gray-400 font-medium">Commandes</p>
                 <p class="mt-1 text-2xl font-bold text-gray-900">{{ $kpis['total_commandes'] }}</p>
@@ -21,6 +21,10 @@
             <div class="card">
                 <p class="text-xs uppercase text-gray-400 font-medium">Livrées</p>
                 <p class="mt-1 text-2xl font-bold text-green-600">{{ $kpis['livrees'] }}</p>
+            </div>
+            <div class="card">
+                <p class="text-xs uppercase text-gray-400 font-medium">Factures impayées</p>
+                <p class="mt-1 text-2xl font-bold text-red-600">{{ $kpis['factures_impayees'] }}</p>
             </div>
             <div class="card">
                 <p class="text-xs uppercase text-gray-400 font-medium">Offres actives</p>
@@ -40,6 +44,7 @@
                 @endif
             </div>
             <div class="flex items-center gap-2">
+                <a href="{{ route('portal.invoices') }}" class="btn-secondary">Mes factures</a>
                 <a href="{{ route('portal.marketeur') }}" class="btn-secondary">Voir la fiche</a>
                 <a href="{{ route('portal.messages') }}" class="btn-primary relative">
                     Messages

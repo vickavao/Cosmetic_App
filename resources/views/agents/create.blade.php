@@ -28,10 +28,23 @@
                 </div>
                 @if ($subordinateRole === \App\Enums\Role::MarketeurTerrain)
                     <div class="sm:col-span-2">
-                        <label class="form-label" for="magasin">Magasin / Point de vente <span class="text-red-500">*</span></label>
-                        <input id="magasin" type="text" name="magasin" value="{{ old('magasin') }}" class="form-input" placeholder="Ex : Boutique Centre-ville" required>
-                        <p class="mt-1 text-xs text-gray-500">Obligatoire : un Marketeur Terrain doit être associé à un magasin.</p>
-                        @error('magasin')<p class="mt-1 text-xs text-red-500">{{ $message }}</p>@enderror
+                        @if ($clients->isEmpty())
+                            <div class="rounded-lg border border-orange-300 bg-orange-50 px-4 py-3">
+                                <p class="text-sm font-medium text-orange-800">Impossible de créer un Marketeur Terrain</p>
+                                <p class="mt-1 text-sm text-orange-700">Créez d'abord un magasin client avant de pouvoir affecter un agent terrain.</p>
+                                <a href="{{ route('clients.create') }}" class="mt-2 inline-block text-sm font-medium text-orange-800 underline">Créer un client</a>
+                            </div>
+                        @else
+                            <label class="form-label" for="client_id">Magasin client d'affectation <span class="text-red-500">*</span></label>
+                            <select id="client_id" name="client_id" class="form-input" required>
+                                <option value="">Sélectionner un magasin client</option>
+                                @foreach ($clients as $client)
+                                    <option value="{{ $client->id }}" @selected(old('client_id') == $client->id)>{{ $client->name }}{{ $client->ville ? ' — '.$client->ville : '' }}</option>
+                                @endforeach
+                            </select>
+                            <p class="mt-1 text-xs text-gray-500">Obligatoire : un Marketeur Terrain doit être affecté au magasin d'un client.</p>
+                            @error('client_id')<p class="mt-1 text-xs text-red-500">{{ $message }}</p>@enderror
+                        @endif
                     </div>
                 @endif
                 <div>
@@ -51,7 +64,8 @@
 
             <div class="flex justify-end gap-3">
                 <a href="{{ route('terrain.team') }}" class="btn-secondary">Annuler</a>
-                <button type="submit" class="btn-primary">
+                <button type="submit" class="btn-primary"
+                    @if ($subordinateRole === \App\Enums\Role::MarketeurTerrain && $clients->isEmpty()) disabled @endif>
                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
                     Créer le compte
                 </button>

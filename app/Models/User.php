@@ -31,6 +31,7 @@ class User extends Authenticatable
         'supervisor_id',
         'phone',
         'magasin',
+        'client_id',
         'avatar',
         'is_active',
     ];
@@ -130,6 +131,14 @@ class User extends Authenticatable
     public function managedClients(): HasMany
     {
         return $this->hasMany(Client::class, 'agent_id');
+    }
+
+    /**
+     * The client (magasin) this terrain agent is assigned to.
+     */
+    public function assignedClient(): BelongsTo
+    {
+        return $this->belongsTo(Client::class, 'client_id');
     }
 
     /**

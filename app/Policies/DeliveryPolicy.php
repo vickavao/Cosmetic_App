@@ -29,13 +29,15 @@ class DeliveryPolicy
     }
 
     /**
-     * Create a delivery (bon de livraison) from a validated order.
+     * Create a delivery from a prepared order (prête à livraison).
+     * Per CDC V2, the Agent Marketeur delivers at Step 4.
      */
     public function create(User $user): bool
     {
         return in_array($user->role, [
             Role::Admin,
             Role::ChefMarketing,
+            Role::AgentMarketeur,
         ], true);
     }
 

@@ -7,7 +7,12 @@
         <div class="flex items-center justify-between">
             <div>
                 <p class="text-sm text-gray-500">Client : {{ $invoice->client?->name }} · Date : {{ $invoice->date?->format('d/m/Y') }}</p>
-                <p class="text-sm text-gray-500">Type : {{ $invoice->type_vente->label() }}</p>
+                <p class="text-sm text-gray-500">
+                    Type : {{ $invoice->type_vente->label() }}
+                    @if ($invoice->date_echeance)
+                        &mdash; Echeance : {{ $invoice->date_echeance->format('d/m/Y') }}
+                    @endif
+                </p>
             </div>
             <a href="{{ route('invoices.index') }}" class="btn-secondary">Retour</a>
         </div>
