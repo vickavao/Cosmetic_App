@@ -36,7 +36,6 @@ class OrderPolicy
             Role::Directeur,
             Role::Commercial,
             Role::AgentMarketeur,
-            Role::MarketeurTerrain,
         ], true);
     }
 

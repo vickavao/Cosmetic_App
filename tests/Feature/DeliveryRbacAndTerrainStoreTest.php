@@ -62,3 +62,11 @@ it('creates a terrain agent when a magasin is provided', function () {
         'magasin' => 'Boutique Centre',
     ]);
 });
+
+it('blocks a terrain agent from creating orders (CDC V2 rule)', function () {
+    $terrain = rbacUserWithRole(Role::MarketeurTerrain);
+
+    $this->actingAs($terrain)
+        ->get(route('orders.create'))
+        ->assertForbidden();
+});
