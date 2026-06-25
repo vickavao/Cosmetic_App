@@ -21,6 +21,7 @@ class Invoice extends Model
         'montant',
         'montant_paye',
         'date',
+        'date_echeance',
         'notes',
     ];
 
@@ -35,6 +36,7 @@ class Invoice extends Model
             'montant' => 'decimal:2',
             'montant_paye' => 'decimal:2',
             'date' => 'date',
+            'date_echeance' => 'date',
         ];
     }
 

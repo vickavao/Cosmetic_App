@@ -26,7 +26,8 @@
             </div>
         @endif
 
-        <form method="POST" action="{{ route('orders.store') }}" class="space-y-6">
+        <form method="POST" action="{{ route('orders.store') }}" class="space-y-6"
+              x-data="{ typeVente: '{{ old('type_vente', 'comptant') }}' }">
             @csrf
 
             <div class="card grid grid-cols-1 sm:grid-cols-2 gap-5">
@@ -42,6 +43,20 @@
                 <div>
                     <label class="form-label" for="date_commande">Date de commande</label>
                     <input id="date_commande" type="date" name="date_commande" value="{{ old('date_commande', now()->toDateString()) }}" class="form-input">
+                </div>
+                <div>
+                    <label class="form-label" for="type_vente">Type de vente</label>
+                    <select id="type_vente" name="type_vente" class="form-input" required x-model="typeVente">
+                        <option value="comptant">Au comptant</option>
+                        <option value="credit">À crédit</option>
+                    </select>
+                    @error('type_vente') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                </div>
+                <div x-show="typeVente === 'credit'" x-cloak>
+                    <label class="form-label" for="date_echeance">Date d'échéance</label>
+                    <input id="date_echeance" type="date" name="date_echeance" value="{{ old('date_echeance') }}" class="form-input"
+                           :required="typeVente === 'credit'" min="{{ now()->addDay()->toDateString() }}">
+                    @error('date_echeance') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
                 </div>
             </div>
 

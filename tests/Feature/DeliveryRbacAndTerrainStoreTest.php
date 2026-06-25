@@ -15,12 +15,12 @@ function rbacUserWithRole(Role $role): User
     return $user;
 }
 
-it('forbids an agent marketeur from creating a goods issue (bon de sortie)', function () {
+it('allows an agent marketeur to access delivery creation (CDC V2 step 4)', function () {
     $agent = rbacUserWithRole(Role::AgentMarketeur);
 
     $this->actingAs($agent)
         ->get(route('deliveries.create'))
-        ->assertForbidden();
+        ->assertOk();
 });
 
 it('allows the chef marketing to access goods issue creation', function () {

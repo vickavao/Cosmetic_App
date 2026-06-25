@@ -11,6 +11,7 @@ use App\Models\Product;
 use App\Models\User;
 use App\Notifications\CommandeSoumise;
 use App\Notifications\CommandeTraitee;
+use App\Notifications\CommandeValidee;
 use App\Notifications\StockInsuffisant;
 use App\Services\InventoryService;
 use App\Services\OrderService;
@@ -77,6 +78,8 @@ class OrderController extends Controller
                 'client_id' => $data['client_id'],
                 'user_id' => $request->user()->id,
                 'statut' => OrderStatus::EnAttente,
+                'type_vente' => $data['type_vente'],
+                'date_echeance' => $data['date_echeance'] ?? null,
                 'total' => 0,
                 'date_commande' => $data['date_commande'] ?? today(),
                 'notes' => $data['notes'] ?? null,
@@ -215,6 +218,16 @@ class OrderController extends Controller
         // Notifier l'agent que sa commande a été validée
         if ($order->user) {
             $order->user->notify(new CommandeTraitee($order, 'validated'));
+        }
+
+        // Notifier les magasiniers pour préparer le bon de sortie
+        $magasiniers = User::query()
+            ->where('role', Role::Magasinier->value)
+            ->where('is_active', true)
+            ->get();
+
+        if ($magasiniers->isNotEmpty()) {
+            Notification::send($magasiniers, new CommandeValidee($order));
         }
 
         $this->orderService->notifyRupture();

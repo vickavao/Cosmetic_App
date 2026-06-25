@@ -30,15 +30,13 @@ class DeliveryService
      */
     public function createFromOrder(Order $order, SaleType $typeVente, ?int $agentId = null, ?int $createdBy = null): Delivery
     {
-        if ($order->statut !== OrderStatus::Validee && $order->statut !== OrderStatus::EnPreparation) {
-            throw new RuntimeException('Seule une commande validée peut être livrée.');
+        if (! in_array($order->statut, [OrderStatus::Validee, OrderStatus::PreteALivraison, OrderStatus::EnPreparation], true)) {
+            throw new RuntimeException('Seule une commande validée ou prête à livraison peut être livrée.');
         }
 
         return DB::transaction(function () use ($order, $typeVente, $agentId, $createdBy): Delivery {
             $orderItems = $order->items()->with('product')->get();
 
-            // The payment mode (credit/cash) chosen when emitting the goods issue
-            // is bound to an invoice so the Chef Marketing can track its progress.
             $invoice = $this->invoices->create(
                 clientId: $order->client_id,
                 agentId: $agentId ?? $order->user_id,
@@ -48,6 +46,7 @@ class DeliveryService
                     'quantite' => (int) $item->quantite,
                 ])->all(),
                 orderId: $order->id,
+                dateEcheance: $order->date_echeance,
             );
 
             $delivery = Delivery::create([
@@ -71,7 +70,7 @@ class DeliveryService
                 ]);
             }
 
-            $order->update(['statut' => OrderStatus::EnPreparation]);
+            $order->update(['statut' => OrderStatus::Livree]);
 
             return $delivery;
         });

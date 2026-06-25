@@ -7,19 +7,28 @@
     $badge = fn (\App\Enums\OrderStatus $s) => match ($s) {
         \App\Enums\OrderStatus::EnAttente => 'badge-orange',
         \App\Enums\OrderStatus::Validee, \App\Enums\OrderStatus::EnPreparation => 'badge-indigo',
+        \App\Enums\OrderStatus::PreteALivraison => 'badge-indigo',
         \App\Enums\OrderStatus::Livree => 'badge-green',
-        \App\Enums\OrderStatus::Annulee => 'badge-red',
+        \App\Enums\OrderStatus::Refusee, \App\Enums\OrderStatus::Annulee => 'badge-red',
     };
 
-    $steps = [
-        ['key' => 'soumise', 'label' => 'Soumise', 'done' => true],
-        ['key' => 'en_attente', 'label' => 'En attente', 'done' => in_array($order->statut, [\App\Enums\OrderStatus::EnAttente, \App\Enums\OrderStatus::Validee, \App\Enums\OrderStatus::EnPreparation, \App\Enums\OrderStatus::Livree])],
-        ['key' => 'validee', 'label' => 'Validée', 'done' => in_array($order->statut, [\App\Enums\OrderStatus::Validee, \App\Enums\OrderStatus::EnPreparation, \App\Enums\OrderStatus::Livree])],
-        ['key' => 'livree', 'label' => 'Livrée', 'done' => $order->statut === \App\Enums\OrderStatus::Livree],
+    $doneStatuses = [
+        \App\Enums\OrderStatus::EnAttente,
+        \App\Enums\OrderStatus::Validee,
+        \App\Enums\OrderStatus::PreteALivraison,
+        \App\Enums\OrderStatus::EnPreparation,
+        \App\Enums\OrderStatus::Livree,
     ];
-    if ($order->statut === \App\Enums\OrderStatus::Annulee) {
+
+    $steps = [
+        ['key' => 'commande', 'label' => 'Étape 1 : Commande', 'done' => true],
+        ['key' => 'validee', 'label' => 'Étape 2 : Validation', 'done' => in_array($order->statut, [\App\Enums\OrderStatus::Validee, \App\Enums\OrderStatus::PreteALivraison, \App\Enums\OrderStatus::Livree])],
+        ['key' => 'bon_sortie', 'label' => 'Étape 3 : Bon de Sortie', 'done' => in_array($order->statut, [\App\Enums\OrderStatus::PreteALivraison, \App\Enums\OrderStatus::Livree])],
+        ['key' => 'livree', 'label' => 'Étape 4 : Livrée', 'done' => $order->statut === \App\Enums\OrderStatus::Livree],
+    ];
+    if (in_array($order->statut, [\App\Enums\OrderStatus::Annulee, \App\Enums\OrderStatus::Refusee])) {
         $steps = [
-            ['key' => 'soumise', 'label' => 'Soumise', 'done' => true],
+            ['key' => 'commande', 'label' => 'Commande', 'done' => true],
             ['key' => 'refusee', 'label' => 'Refusée', 'done' => true],
         ];
     }
@@ -67,7 +76,7 @@
             </div>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-5">
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-5">
             <div class="card">
                 <p class="text-xs uppercase text-gray-400 font-medium">Client</p>
                 <p class="mt-1 font-semibold text-gray-900">{{ $order->client?->name }}</p>
@@ -76,6 +85,13 @@
             <div class="card">
                 <p class="text-xs uppercase text-gray-400 font-medium">Statut</p>
                 <p class="mt-2"><span class="badge {{ $badge($order->statut) }}">{{ $order->statut->label() }}</span></p>
+            </div>
+            <div class="card">
+                <p class="text-xs uppercase text-gray-400 font-medium">Type de vente</p>
+                <p class="mt-1 font-semibold text-gray-900">{{ $order->type_vente === \App\Enums\SaleType::Credit ? 'À crédit' : 'Au comptant' }}</p>
+                @if ($order->type_vente === \App\Enums\SaleType::Credit && $order->date_echeance)
+                    <p class="text-sm text-gray-500">Échéance : {{ $order->date_echeance->format('d/m/Y') }}</p>
+                @endif
             </div>
             <div class="card">
                 <p class="text-xs uppercase text-gray-400 font-medium">Total</p>

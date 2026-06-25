@@ -50,7 +50,7 @@ it('creates a prepared delivery from a validated order', function () {
 
     expect($delivery->statut)->toBe(DeliveryStatus::Prepare);
     expect($delivery->lines)->toHaveCount(1);
-    expect($order->refresh()->statut)->toBe(OrderStatus::EnPreparation);
+    expect($order->refresh()->statut)->toBe(OrderStatus::Livree);
 });
 
 it('confirming a delivery issues physical stock and generates a goods issue note', function () {

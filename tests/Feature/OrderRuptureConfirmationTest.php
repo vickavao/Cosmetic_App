@@ -25,6 +25,7 @@ it('asks for confirmation when an ordered product is out of stock', function () 
         ->post(route('orders.store'), [
             'client_id' => $client->id,
             'date_commande' => today()->toDateString(),
+            'type_vente' => 'comptant',
             'items' => [['product_id' => $product->id, 'quantite' => 5]],
         ])
         ->assertRedirect()
@@ -42,6 +43,7 @@ it('creates the order and keeps the ruptured item once confirmed', function () {
         ->post(route('orders.store'), [
             'client_id' => $client->id,
             'date_commande' => today()->toDateString(),
+            'type_vente' => 'comptant',
             'confirm_rupture' => 1,
             'items' => [['product_id' => $product->id, 'quantite' => 5]],
         ])
