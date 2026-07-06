@@ -25,7 +25,7 @@ it('stores the chef feedback (rejection reason) when rejecting an order', functi
         'reference' => 'CMD-'.uniqid(),
         'client_id' => $client->id,
         'user_id' => $agent->id,
-        'statut' => OrderStatus::EnAttente,
+        'statut' => OrderStatus::EnAttenteValidation,
         'total' => 100,
         'date_commande' => today(),
     ]);

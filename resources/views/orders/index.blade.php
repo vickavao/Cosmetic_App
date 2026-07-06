@@ -5,10 +5,10 @@
 
 @php
     $badge = fn (\App\Enums\OrderStatus $s) => match ($s) {
-        \App\Enums\OrderStatus::EnAttente => 'badge-orange',
+        \App\Enums\OrderStatus::EnAttenteValidation => 'badge-orange',
         \App\Enums\OrderStatus::Validee, \App\Enums\OrderStatus::EnPreparation => 'badge-indigo',
-        \App\Enums\OrderStatus::PreteALivraison => 'badge-blue',
-        \App\Enums\OrderStatus::Livree => 'badge-green',
+        \App\Enums\OrderStatus::PretPourLivraison => 'badge-blue',
+        \App\Enums\OrderStatus::LivreeEtFacturee => 'badge-green',
         \App\Enums\OrderStatus::Refusee, \App\Enums\OrderStatus::Annulee => 'badge-red',
     };
 @endphp

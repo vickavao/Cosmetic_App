@@ -29,6 +29,40 @@
         ])
     </div>
 
+    {{-- Étape 3 : Commandes validées à préparer (Bon de Sortie) --}}
+    <div class="card p-0 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200 flex items-center gap-2">
+            <svg class="text-[#6366F1]" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg>
+            <h2 class="text-base font-semibold text-gray-900">Commandes à préparer</h2>
+            <span class="badge badge-indigo ml-auto">{{ ($ordersToIssue ?? collect())->count() }}</span>
+        </div>
+        <div class="divide-y divide-gray-100">
+            @forelse ($ordersToIssue ?? collect() as $order)
+                <div class="flex items-center justify-between px-6 py-4">
+                    <div>
+                        <p class="text-sm font-medium text-gray-900">{{ $order->reference }} — {{ $order->client?->name }}</p>
+                        <p class="text-xs text-gray-500">
+                            Agent {{ $order->user?->name }} · {{ $order->items->count() }} produit(s) ·
+                            {{ $order->items->sum('quantite') }} unité(s) · {{ $order->date_commande?->format('d/m/Y') }}
+                        </p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <a href="{{ route('orders.show', $order) }}" class="btn-secondary !py-1.5 !px-3 text-xs">Détails</a>
+                        @can('createGoodsIssueNote', $order)
+                            <form method="POST" action="{{ route('orders.goods-issue-note', $order) }}"
+                                  onsubmit="return confirm('Émettre le Bon de Sortie ? Le stock physique sera décrémenté.');">
+                                @csrf
+                                <button class="btn-primary !py-1.5 !px-3 text-xs">Générer le Bon de Sortie</button>
+                            </form>
+                        @endcan
+                    </div>
+                </div>
+            @empty
+                <div class="px-6 py-10 text-center text-sm text-gray-400">Aucune commande à préparer.</div>
+            @endforelse
+        </div>
+    </div>
+
     {{-- Carousel des produits disponibles + quantités --}}
     <div class="card">
         <div class="flex items-center justify-between mb-4">

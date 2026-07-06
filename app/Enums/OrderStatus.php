@@ -4,23 +4,23 @@ namespace App\Enums;
 
 enum OrderStatus: string
 {
-    case EnAttente = 'en_attente';
+    case EnAttenteValidation = 'en_attente_validation';
     case Validee = 'validee';
     case Refusee = 'refusee';
-    case PreteALivraison = 'prete_a_livraison';
+    case PretPourLivraison = 'pret_pour_livraison';
     case EnPreparation = 'en_preparation';
-    case Livree = 'livree';
+    case LivreeEtFacturee = 'livree_et_facturee';
     case Annulee = 'annulee';
 
     public function label(): string
     {
         return match ($this) {
-            self::EnAttente => 'En attente',
+            self::EnAttenteValidation => 'En attente de validation',
             self::Validee => 'Validée',
             self::Refusee => 'Refusée',
-            self::PreteALivraison => 'Prête à livraison',
+            self::PretPourLivraison => 'Prêt pour livraison',
             self::EnPreparation => 'En préparation',
-            self::Livree => 'Livrée',
+            self::LivreeEtFacturee => 'Livrée et facturée',
             self::Annulee => 'Annulée',
         };
     }

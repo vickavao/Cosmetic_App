@@ -48,7 +48,7 @@ class DeliveryController extends Controller
         Gate::authorize('create', Delivery::class);
 
         $orders = Order::query()
-            ->where('statut', OrderStatus::PreteALivraison->value)
+            ->where('statut', OrderStatus::PretPourLivraison->value)
             ->when(
                 $request->user()->role === Role::AgentMarketeur,
                 fn ($q) => $q->where('user_id', $request->user()->id)
@@ -70,7 +70,7 @@ class DeliveryController extends Controller
 
         $order = Order::with(['client', 'items.product', 'user'])->findOrFail($data['order_id']);
 
-        if ($order->statut !== OrderStatus::PreteALivraison) {
+        if ($order->statut !== OrderStatus::PretPourLivraison) {
             return back()->with('warning', 'Seule une commande prête à livraison peut être livrée.');
         }
 

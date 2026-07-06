@@ -61,7 +61,7 @@ it('step 1: agent marketeur creates a comptant order', function () {
     $response->assertRedirect();
 
     $order = Order::latest('id')->first();
-    expect($order->statut)->toBe(OrderStatus::EnAttente);
+    expect($order->statut)->toBe(OrderStatus::EnAttenteValidation);
     expect($order->type_vente)->toBe(SaleType::Comptant);
     expect($order->date_echeance)->toBeNull();
     expect((float) $order->total)->toBe(125.00);
@@ -86,7 +86,7 @@ it('step 1: agent marketeur creates a credit order with date_echeance', function
     $response->assertRedirect();
 
     $order = Order::latest('id')->first();
-    expect($order->statut)->toBe(OrderStatus::EnAttente);
+    expect($order->statut)->toBe(OrderStatus::EnAttenteValidation);
     expect($order->type_vente)->toBe(SaleType::Credit);
     expect($order->date_echeance->toDateString())->toBe($echeance);
 });
@@ -176,7 +176,7 @@ it('step 3: magasinier creates bon de sortie and stock is decremented', function
     $response->assertRedirect();
 
     $order->refresh();
-    expect($order->statut)->toBe(OrderStatus::PreteALivraison);
+    expect($order->statut)->toBe(OrderStatus::PretPourLivraison);
 
     $this->product->refresh();
     expect($this->product->stock)->toBe(90);
@@ -225,7 +225,7 @@ it('step 4: agent delivers and invoice is auto-generated', function () {
     $response->assertRedirect();
 
     $order->refresh();
-    expect($order->statut)->toBe(OrderStatus::Livree);
+    expect($order->statut)->toBe(OrderStatus::LivreeEtFacturee);
 
     $this->assertDatabaseHas('deliveries', ['order_id' => $order->id]);
     $this->assertDatabaseHas('invoices', ['order_id' => $order->id]);
@@ -275,7 +275,7 @@ it('full 4-step workflow: order -> validation -> bon de sortie -> delivery + inv
         ]);
 
     $order = Order::latest('id')->first();
-    expect($order->statut)->toBe(OrderStatus::EnAttente);
+    expect($order->statut)->toBe(OrderStatus::EnAttenteValidation);
     expect($this->product->refresh()->stock)->toBe(100);
 
     // Step 2: Chef validates
@@ -287,13 +287,13 @@ it('full 4-step workflow: order -> validation -> bon de sortie -> delivery + inv
     // Step 3: Magasinier creates bon de sortie
     actingAs($this->magasinier)->post(route('goods-issue-notes.store'), ['order_id' => $order->id]);
     $order->refresh();
-    expect($order->statut)->toBe(OrderStatus::PreteALivraison);
+    expect($order->statut)->toBe(OrderStatus::PretPourLivraison);
     expect($this->product->refresh()->stock)->toBe(92);
 
     // Step 4: Agent delivers
     actingAs($this->agent)->post(route('deliveries.store'), ['order_id' => $order->id]);
     $order->refresh();
-    expect($order->statut)->toBe(OrderStatus::Livree);
+    expect($order->statut)->toBe(OrderStatus::LivreeEtFacturee);
 
     $invoice = $order->invoices()->first();
     expect($invoice)->not->toBeNull();
@@ -309,7 +309,7 @@ function wfPendingOrder(User $agent, Client $client, Product $product, int $qty)
         'reference' => 'CMD-'.strtoupper(uniqid()),
         'client_id' => $client->id,
         'user_id' => $agent->id,
-        'statut' => OrderStatus::EnAttente,
+        'statut' => OrderStatus::EnAttenteValidation,
         'type_vente' => SaleType::Comptant,
         'total' => $product->price * $qty,
         'date_commande' => today(),
@@ -354,7 +354,7 @@ function wfReadyOrder(
         'reference' => 'CMD-'.strtoupper(uniqid()),
         'client_id' => $client->id,
         'user_id' => $agent->id,
-        'statut' => OrderStatus::EnAttente,
+        'statut' => OrderStatus::EnAttenteValidation,
         'type_vente' => $typeVente,
         'date_echeance' => $dateEcheance,
         'total' => $product->price * $qty,
@@ -406,7 +406,7 @@ function wfReadyOrder(
         ]);
     }
 
-    $order->update(['statut' => OrderStatus::PreteALivraison]);
+    $order->update(['statut' => OrderStatus::PretPourLivraison]);
 
     return $order;
 }

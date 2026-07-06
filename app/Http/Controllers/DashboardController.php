@@ -49,7 +49,7 @@ class DashboardController extends Controller
             'kpis' => [
                 'commandes_a_valider' => Order::query()->enAttente()->count(),
                 'ca_equipe' => (float) Order::query()
-                    ->whereIn('statut', [OrderStatus::Validee->value, OrderStatus::Livree->value])
+                    ->whereIn('statut', [OrderStatus::Validee->value, OrderStatus::LivreeEtFacturee->value])
                     ->sum('total'),
                 'agents_actifs' => User::query()
                     ->withRole(Role::AgentMarketeur)
@@ -87,7 +87,7 @@ class DashboardController extends Controller
                     ->count(),
                 'livrees' => Order::query()
                     ->where('user_id', $user->id)
-                    ->where('statut', OrderStatus::Livree->value)
+                    ->where('statut', OrderStatus::LivreeEtFacturee->value)
                     ->count(),
                 'refusees' => Order::query()
                     ->where('user_id', $user->id)
@@ -99,6 +99,13 @@ class DashboardController extends Controller
                 ->with(['client'])
                 ->latest('date_commande')
                 ->limit(10)
+                ->get(),
+            // Étape 4 : commandes débloquées par le Magasinier, prêtes à livrer/facturer.
+            'ordersToDeliver' => Order::query()
+                ->where('user_id', $user->id)
+                ->where('statut', OrderStatus::PretPourLivraison->value)
+                ->with(['client', 'items'])
+                ->latest('date_commande')
                 ->get(),
             'teamReports' => $reports->take(10),
         ];
@@ -157,7 +164,16 @@ class DashboardController extends Controller
                 'total_produits' => Product::query()->count(),
                 'unites_en_stock' => (int) Product::query()->sum('stock'),
                 'en_rupture' => Product::query()->enRupture()->count(),
+                'commandes_a_preparer' => Order::query()
+                    ->where('statut', OrderStatus::Validee->value)
+                    ->count(),
             ],
+            // Étape 3 : commandes validées par le Chef Marketing, à préparer (Bon de Sortie).
+            'ordersToIssue' => Order::query()
+                ->where('statut', OrderStatus::Validee->value)
+                ->with(['client', 'user', 'items.product'])
+                ->latest('date_commande')
+                ->get(),
             // Carousel des produits disponibles + quantités (pas de valeur monétaire).
             'disponibles' => Product::query()
                 ->where('is_active', true)

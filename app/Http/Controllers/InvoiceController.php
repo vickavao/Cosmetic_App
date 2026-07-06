@@ -2,74 +2,46 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\InvoiceStatus;
+use App\Enums\Role;
 use App\Enums\SaleType;
-use App\Models\Client;
 use App\Models\Invoice;
-use App\Models\Product;
-use App\Services\InvoiceService;
+use App\Models\User;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Contracts\View\View;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Gate;
 
 class InvoiceController extends Controller
 {
-    public function __construct(private InvoiceService $invoiceService) {}
-
     public function index(Request $request): View
     {
         Gate::authorize('viewAny', Invoice::class);
 
         $user = $request->user();
 
+        $isAgent = $user->role === Role::AgentMarketeur;
+
         $invoices = Invoice::query()
-            ->where('agent_id', $user->id)
-            ->when($request->filled('statut'), fn ($q) => $q->where('statut', $request->string('statut')))
-            ->with('client')
+            ->when($isAgent, fn ($q) => $q->where('agent_id', $user->id))
+            ->when(! $isAgent && $request->filled('agent_id'), fn ($q) => $q->where('agent_id', $request->integer('agent_id')))
+            ->when($request->filled('type_vente'), fn ($q) => $q->where('type_vente', $request->string('type_vente')))
+            ->when($request->filled('date_from'), fn ($q) => $q->whereDate('date', '>=', $request->date('date_from')))
+            ->when($request->filled('date_to'), fn ($q) => $q->whereDate('date', '<=', $request->date('date_to')))
+            ->with(['client', 'agent'])
             ->latest('date')
-            ->paginate(20);
+            ->paginate(20)
+            ->withQueryString();
 
         return view('invoices.index', [
             'invoices' => $invoices,
-            'statuts' => InvoiceStatus::cases(),
+            'typesVente' => SaleType::cases(),
+            'isAgent' => $isAgent,
+            'agents' => $isAgent ? collect() : User::query()
+                ->where('role', Role::AgentMarketeur->value)
+                ->orderBy('name')
+                ->get(),
         ]);
-    }
-
-    public function create(Request $request): View
-    {
-        Gate::authorize('create', Invoice::class);
-
-        return view('invoices.create', [
-            'clients' => Client::query()->where('agent_id', $request->user()->id)->orderBy('name')->get(),
-            'products' => Product::query()->where('is_active', true)->orderBy('name')->get(),
-        ]);
-    }
-
-    public function store(Request $request): RedirectResponse
-    {
-        Gate::authorize('create', Invoice::class);
-
-        $data = $request->validate([
-            'client_id' => ['required', 'integer', 'exists:clients,id'],
-            'type_vente' => ['required', 'in:'.implode(',', SaleType::values())],
-            'notes' => ['nullable', 'string'],
-            'items' => ['required', 'array', 'min:1'],
-            'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
-            'items.*.quantite' => ['required', 'integer', 'min:1'],
-        ]);
-
-        $invoice = $this->invoiceService->create(
-            $data['client_id'],
-            $request->user()->id,
-            SaleType::from($data['type_vente']),
-            $data['items'],
-            $data['notes'] ?? null,
-        );
-
-        return redirect()
-            ->route('invoices.show', $invoice)
-            ->with('status', 'Facture créée.');
     }
 
     public function show(Invoice $invoice): View
@@ -81,16 +53,41 @@ class InvoiceController extends Controller
         return view('invoices.show', ['invoice' => $invoice]);
     }
 
-    public function pay(Request $request, Invoice $invoice): RedirectResponse
+    public function downloadPdf(Invoice $invoice): Response
     {
-        Gate::authorize('update', $invoice);
+        Gate::authorize('view', $invoice);
 
-        $data = $request->validate([
-            'montant' => ['required', 'numeric', 'min:0.01'],
-        ]);
+        $invoice->load(['client', 'agent', 'lines.product']);
 
-        $this->invoiceService->registerPayment($invoice, (float) $data['montant']);
+        $pdf = Pdf::loadView('invoices.pdf', ['invoice' => $invoice])->setPaper('a4', 'portrait');
 
-        return back()->with('status', 'Paiement enregistré.');
+        return $pdf->download('facture-'.$invoice->reference.'.pdf');
+    }
+
+    public function dailyReport(Request $request): Response
+    {
+        Gate::authorize('viewAny', Invoice::class);
+
+        abort_if($request->user()->role === Role::AgentMarketeur, 403, 'Le rapport consolidé est réservé au Chef Marketing.');
+
+        $date = $request->filled('date') ? $request->date('date') : today();
+
+        $invoices = Invoice::query()
+            ->whereDate('date', $date)
+            ->with(['client', 'agent'])
+            ->orderBy('agent_id')
+            ->latest('date')
+            ->get();
+
+        $parAgent = $invoices->groupBy(fn (Invoice $invoice): string => $invoice->agent?->name ?? 'Inconnu');
+
+        $pdf = Pdf::loadView('invoices.daily-report', [
+            'date' => $date,
+            'invoices' => $invoices,
+            'parAgent' => $parAgent,
+            'totalGeneral' => (float) $invoices->sum('montant'),
+        ])->setPaper('a4', 'portrait');
+
+        return $pdf->download('rapport-ventes-'.$date->format('Y-m-d').'.pdf');
     }
 }

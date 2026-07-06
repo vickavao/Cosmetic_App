@@ -1,10 +1,10 @@
 <?php
 
 use App\Http\Controllers\AgentController;
+use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\ClientPortalController;
 use App\Http\Controllers\ConversionRateController;
-use App\Http\Controllers\DailyClosureController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DeliveryController;
 use App\Http\Controllers\GoodsIssueNoteController;
@@ -18,6 +18,7 @@ use App\Http\Controllers\ReportController;
 use App\Http\Controllers\StockAlertController;
 use App\Http\Controllers\TerrainComplaintController;
 use App\Http\Controllers\TerrainController;
+use App\Http\Controllers\TerrainReportController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -40,6 +41,14 @@ Route::middleware('auth')->group(function () {
     |--------------------------------------------------------------------------
     */
     Route::get('/terrain', [TerrainController::class, 'index'])->name('terrain.index');
+
+    // Rapports journaliers terrain (Agent Terrain N3)
+    Route::middleware('role:marketeur_terrain|agent_marketeur|chef_marketing|admin')->group(function () {
+        Route::get('/terrain-reports', [TerrainReportController::class, 'index'])->name('terrain-reports.index');
+        Route::get('/terrain-reports/create', [TerrainReportController::class, 'create'])->name('terrain-reports.create');
+        Route::post('/terrain-reports', [TerrainReportController::class, 'store'])->name('terrain-reports.store');
+        Route::get('/terrain-reports/{terrainReport}', [TerrainReportController::class, 'show'])->name('terrain-reports.show');
+    });
 
     Route::get('/terrain/equipe', [TerrainController::class, 'team'])
         ->middleware('role:agent_marketeur|chef_marketing|directeur|admin')
@@ -131,6 +140,17 @@ Route::middleware('auth')->group(function () {
         Route::patch('/orders/{order}/reject', [OrderController::class, 'rejectOrder'])->name('orders.reject');
     });
 
+    // Bon de Sortie (Magasinier) - Étape 3 du workflow sécurisé
+    Route::middleware('role:magasinier|admin')->group(function () {
+        Route::get('/orders-a-preparer', [OrderController::class, 'toPrepare'])->name('orders.to-prepare');
+        Route::post('/orders/{order}/goods-issue-note', [OrderController::class, 'createGoodsIssueNote'])->name('orders.goods-issue-note');
+    });
+
+    // Facturation 1-click (Agent Marketeur) - Étape 4 du workflow sécurisé
+    Route::middleware('role:agent_marketeur|admin')->group(function () {
+        Route::post('/orders/{order}/invoice', [OrderController::class, 'createInvoice'])->name('orders.invoice');
+    });
+
     Route::resource('orders', OrderController::class)->except(['edit', 'update']);
 
     /*
@@ -171,21 +191,9 @@ Route::middleware('auth')->group(function () {
     */
     Route::middleware('role:agent_marketeur|chef_marketing|admin|directeur')->group(function () {
         Route::get('/invoices', [InvoiceController::class, 'index'])->name('invoices.index');
-        Route::get('/invoices/create', [InvoiceController::class, 'create'])->name('invoices.create');
-        Route::post('/invoices', [InvoiceController::class, 'store'])->name('invoices.store');
+        Route::get('/invoices/rapport-journalier', [InvoiceController::class, 'dailyReport'])->name('invoices.daily-report');
         Route::get('/invoices/{invoice}', [InvoiceController::class, 'show'])->name('invoices.show');
-        Route::patch('/invoices/{invoice}/pay', [InvoiceController::class, 'pay'])->name('invoices.pay');
-    });
-
-    /*
-    |--------------------------------------------------------------------------
-    | Clôture journalière (Magasinier, Chef Marketing, Agent Marketeur, Terrain)
-    |--------------------------------------------------------------------------
-    */
-    Route::middleware('role:magasinier|chef_marketing|agent_marketeur|marketeur_terrain')->group(function () {
-        Route::get('/clotures', [DailyClosureController::class, 'index'])->name('closures.index');
-        Route::post('/clotures', [DailyClosureController::class, 'store'])->name('closures.store');
-        Route::get('/clotures/{closure}', [DailyClosureController::class, 'show'])->name('closures.show');
+        Route::get('/invoices/{invoice}/pdf', [InvoiceController::class, 'downloadPdf'])->name('invoices.pdf');
     });
 
     /*
@@ -219,6 +227,9 @@ Route::middleware('auth')->group(function () {
         Route::get('/factures', [ClientPortalController::class, 'invoices'])->name('portal.invoices');
         Route::get('/catalogue', [ClientPortalController::class, 'catalogue'])->name('portal.catalogue');
         Route::get('/offres', [ClientPortalController::class, 'offers'])->name('portal.offers');
+        Route::get('/nouveautes', [ClientPortalController::class, 'news'])->name('portal.news');
+        Route::get('/mon-profil', [ClientPortalController::class, 'profile'])->name('portal.profile');
+        Route::patch('/mon-profil', [ClientPortalController::class, 'updateProfile'])->name('portal.profile.update');
         Route::get('/mon-marketeur', [ClientPortalController::class, 'marketeur'])->name('portal.marketeur');
         Route::get('/messages', [ClientPortalController::class, 'messages'])->name('portal.messages');
         Route::post('/messages', [ClientPortalController::class, 'sendMessage'])->name('portal.messages.send');
@@ -234,6 +245,12 @@ Route::middleware('auth')->group(function () {
         Route::get('/offres/create', [OfferController::class, 'create'])->name('offers.create');
         Route::post('/offres', [OfferController::class, 'store'])->name('offers.store');
         Route::delete('/offres/{offer}', [OfferController::class, 'destroy'])->name('offers.destroy');
+
+        // Fil d'actualités (Nouveautés & Événements) destiné à l'espace client.
+        Route::get('/actualites', [AnnouncementController::class, 'index'])->name('announcements.index');
+        Route::get('/actualites/create', [AnnouncementController::class, 'create'])->name('announcements.create');
+        Route::post('/actualites', [AnnouncementController::class, 'store'])->name('announcements.store');
+        Route::delete('/actualites/{announcement}', [AnnouncementController::class, 'destroy'])->name('announcements.destroy');
     });
 
     Route::post('/notifications/read-all', function () {

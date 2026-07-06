@@ -30,7 +30,7 @@ class DeliveryService
      */
     public function createFromOrder(Order $order, SaleType $typeVente, ?int $agentId = null, ?int $createdBy = null): Delivery
     {
-        if (! in_array($order->statut, [OrderStatus::Validee, OrderStatus::PreteALivraison, OrderStatus::EnPreparation], true)) {
+        if (! in_array($order->statut, [OrderStatus::Validee, OrderStatus::PretPourLivraison, OrderStatus::EnPreparation], true)) {
             throw new RuntimeException('Seule une commande validée ou prête à livraison peut être livrée.');
         }
 
@@ -70,7 +70,7 @@ class DeliveryService
                 ]);
             }
 
-            $order->update(['statut' => OrderStatus::Livree]);
+            $order->update(['statut' => OrderStatus::LivreeEtFacturee]);
 
             return $delivery;
         });
@@ -129,7 +129,7 @@ class DeliveryService
                 'delivered_at' => now(),
             ]);
 
-            $delivery->order?->update(['statut' => OrderStatus::Livree]);
+            $delivery->order?->update(['statut' => OrderStatus::LivreeEtFacturee]);
 
             return $note;
         });

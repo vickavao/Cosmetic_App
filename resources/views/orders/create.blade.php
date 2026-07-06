@@ -14,17 +14,9 @@
             <a href="{{ route('orders.index') }}" class="btn-secondary">Retour</a>
         </div>
 
-        @if (session('rupture_confirmation'))
-            <div class="rounded-xl border border-orange-300 bg-orange-50 p-5">
-                <h2 class="text-base font-semibold text-orange-800">Confirmation requise : produits en rupture</h2>
-                <p class="text-sm text-orange-700 mt-1">Les produits suivants sont indisponibles. Vous pouvez soumettre la commande malgré tout : la production sera alertée.</p>
-                <ul class="mt-3 text-sm text-orange-800 list-disc list-inside">
-                    @foreach (session('rupture_confirmation') as $m)
-                        <li>{{ $m['name'] }} — demandé {{ $m['demande'] }}, disponible {{ $m['disponible'] }}</li>
-                    @endforeach
-                </ul>
-            </div>
-        @endif
+        @error('items.0.quantite')
+            <div class="rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">{{ $message }}</div>
+        @enderror
 
         <form method="POST" action="{{ route('orders.store') }}" class="space-y-6"
               x-data="{ typeVente: '{{ old('type_vente', 'comptant') }}' }">
@@ -80,10 +72,10 @@
                             </div>
                             <div class="col-span-3">
                                 <label class="form-label">Quantité</label>
-                                <input type="number" min="1" class="form-input" :name="`items[${index}][quantite]`" x-model.number="line.quantite" required>
+                                <input type="number" min="1" :max="line.product_id ? stockOf(line.product_id) : null" class="form-input" :name="`items[${index}][quantite]`" x-model.number="line.quantite" required>
                                 <p x-show="line.product_id && line.quantite > stockOf(line.product_id)" x-cloak
-                                   class="mt-1 text-xs text-orange-600">
-                                    Stock insuffisant (<span x-text="stockOf(line.product_id)"></span> dispo) — confirmation requise.
+                                   class="mt-1 text-xs text-red-600 font-medium">
+                                    Stock insuffisant (<span x-text="stockOf(line.product_id)"></span> dispo) — commande impossible.
                                 </p>
                             </div>
                             <div class="col-span-2">
@@ -110,14 +102,9 @@
                 <textarea id="notes" name="notes" rows="2" class="form-input" placeholder="Informations complémentaires...">{{ old('notes') }}</textarea>
             </div>
 
-            <div class="card flex items-center gap-3">
-                <input type="checkbox" id="confirm_rupture" name="confirm_rupture" value="1" class="rounded border-gray-300" @checked(session('rupture_confirmation'))>
-                <label for="confirm_rupture" class="text-sm text-gray-700">Soumettre même si certains produits sont en rupture (la production sera alertée).</label>
-            </div>
-
             <div class="flex justify-end gap-3">
                 <a href="{{ route('orders.index') }}" class="btn-secondary">Annuler</a>
-                <button type="submit" class="btn-primary">Créer la commande</button>
+                <button type="submit" class="btn-primary" :disabled="hasStockIssue()" :class="hasStockIssue() ? 'opacity-50 cursor-not-allowed' : ''">Créer la commande</button>
             </div>
         </form>
     </div>
@@ -133,6 +120,7 @@
                 stockOf(id) { const p = this.products.find(p => p.id === id); return p ? p.stock : 0; },
                 lineTotal(line) { return this.priceOf(line.product_id) * (line.quantite || 0); },
                 total() { return this.lines.reduce((s, l) => s + this.lineTotal(l), 0); },
+                hasStockIssue() { return this.lines.some(l => l.product_id && l.quantite > this.stockOf(l.product_id)); },
                 onProductChange(index) {
                     const line = this.lines[index];
                     if (!line.product_id) return;

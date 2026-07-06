@@ -16,7 +16,7 @@ function agentUser(): User
     return $user;
 }
 
-it('asks for confirmation when an ordered product is out of stock', function () {
+it('blocks the order when the requested quantity exceeds available stock', function () {
     $agent = agentUser();
     $client = Client::factory()->create();
     $product = Product::factory()->create(['stock' => 1, 'stock_reserved' => 0, 'seuil_alerte' => 0]);
@@ -28,33 +28,45 @@ it('asks for confirmation when an ordered product is out of stock', function () 
             'type_vente' => 'comptant',
             'items' => [['product_id' => $product->id, 'quantite' => 5]],
         ])
-        ->assertRedirect()
-        ->assertSessionHas('rupture_confirmation');
+        ->assertSessionHasErrors(['items.0.quantite']);
 
     expect(Order::count())->toBe(0);
 });
 
-it('creates the order and keeps the ruptured item once confirmed', function () {
+it('blocks the order when cumulated duplicate lines exceed available stock', function () {
     $agent = agentUser();
     $client = Client::factory()->create();
-    $product = Product::factory()->create(['stock' => 1, 'stock_reserved' => 0, 'seuil_alerte' => 0]);
+    $product = Product::factory()->create(['stock' => 4, 'stock_reserved' => 0, 'seuil_alerte' => 0]);
 
     $this->actingAs($agent)
         ->post(route('orders.store'), [
             'client_id' => $client->id,
             'date_commande' => today()->toDateString(),
             'type_vente' => 'comptant',
-            'confirm_rupture' => 1,
+            'items' => [
+                ['product_id' => $product->id, 'quantite' => 3],
+                ['product_id' => $product->id, 'quantite' => 3],
+            ],
+        ])
+        ->assertSessionHasErrors(['items.0.quantite']);
+
+    expect(Order::count())->toBe(0);
+});
+
+it('creates the order when the requested quantity is within available stock', function () {
+    $agent = agentUser();
+    $client = Client::factory()->create();
+    $product = Product::factory()->create(['stock' => 10, 'stock_reserved' => 0, 'seuil_alerte' => 0]);
+
+    $this->actingAs($agent)
+        ->post(route('orders.store'), [
+            'client_id' => $client->id,
+            'date_commande' => today()->toDateString(),
+            'type_vente' => 'comptant',
             'items' => [['product_id' => $product->id, 'quantite' => 5]],
         ])
+        ->assertSessionHasNoErrors()
         ->assertRedirect();
 
-    $order = Order::first();
-    expect($order)->not->toBeNull();
-    expect($order->items()->count())->toBe(1);
-
-    $this->assertDatabaseHas('stock_alerts', [
-        'product_id' => $product->id,
-        'order_id' => $order->id,
-    ]);
+    expect(Order::count())->toBe(1);
 });

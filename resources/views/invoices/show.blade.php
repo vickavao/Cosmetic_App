@@ -14,20 +14,18 @@
                     @endif
                 </p>
             </div>
-            <a href="{{ route('invoices.index') }}" class="btn-secondary">Retour</a>
+            <div class="flex items-center gap-3">
+                <a href="{{ route('invoices.pdf', $invoice) }}" class="btn-primary">Télécharger le PDF</a>
+                <a href="{{ route('invoices.index') }}" class="btn-secondary">Retour</a>
+            </div>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div class="card"><p class="text-xs uppercase text-gray-400 font-medium">Montant</p><p class="mt-1 text-xl font-bold text-gray-900">@money((float) $invoice->montant)</p></div>
-            <div class="card"><p class="text-xs uppercase text-gray-400 font-medium">Payé</p><p class="mt-1 text-xl font-bold text-green-600">@money((float) $invoice->montant_paye)</p></div>
-            <div class="card"><p class="text-xs uppercase text-gray-400 font-medium">Reste à payer</p><p class="mt-1 text-xl font-bold text-orange-600">@money($invoice->resteAPayer())</p></div>
-        </div>
-
-        <div class="card">
-            <div class="flex items-center justify-between">
-                <span class="text-sm text-gray-500">Statut</span>
-                @php($st = $invoice->statut)
-                <span class="badge {{ $st === \App\Enums\InvoiceStatus::Payee ? 'badge-green' : ($st === \App\Enums\InvoiceStatus::Annulee ? 'badge-red' : ($st === \App\Enums\InvoiceStatus::Partielle ? 'badge-orange' : 'badge-gray')) }}">{{ $st->label() }}</span>
+        @php($estComptant = $invoice->type_vente === \App\Enums\SaleType::Comptant)
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div class="card"><p class="text-xs uppercase text-gray-400 font-medium">Montant total</p><p class="mt-1 text-xl font-bold text-gray-900">@money((float) $invoice->montant)</p></div>
+            <div class="card">
+                <p class="text-xs uppercase text-gray-400 font-medium">Statut</p>
+                <p class="mt-1"><span class="badge {{ $estComptant ? 'badge-green' : 'badge-orange' }}">{{ $estComptant ? 'Payé' : 'Pris à crédit' }}</span></p>
             </div>
         </div>
 
@@ -53,18 +51,5 @@
             </table>
         </div>
 
-        @can('update', $invoice)
-            @if ($invoice->statut !== \App\Enums\InvoiceStatus::Payee && $invoice->statut !== \App\Enums\InvoiceStatus::Annulee)
-                <form method="POST" action="{{ route('invoices.pay', $invoice) }}" class="card flex items-end gap-3">
-                    @csrf
-                    @method('PATCH')
-                    <div class="flex-1">
-                        <label class="form-label" for="montant">Enregistrer un paiement ($)</label>
-                        <input id="montant" type="number" step="0.01" min="0.01" max="{{ $invoice->resteAPayer() }}" name="montant" class="form-input" required>
-                    </div>
-                    <button type="submit" class="btn-primary">Encaisser</button>
-                </form>
-            @endif
-        @endcan
     </div>
 </x-app-layout>

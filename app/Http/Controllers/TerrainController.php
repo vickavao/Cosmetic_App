@@ -126,7 +126,7 @@ class TerrainController extends Controller
                     'user' => $member,
                     'orders_count' => (clone $monthlyOrders)->count(),
                     'ca' => (float) (clone $monthlyOrders)
-                        ->whereIn('statut', [OrderStatus::Validee->value, OrderStatus::Livree->value])
+                        ->whereIn('statut', [OrderStatus::Validee->value, OrderStatus::LivreeEtFacturee->value])
                         ->sum('total'),
                 ];
             });

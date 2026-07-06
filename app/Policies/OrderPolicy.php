@@ -24,7 +24,7 @@ class OrderPolicy
             Role::Admin,
             Role::Directeur,
             Role::ChefMarketing,
-            Role::Commercial,
+            Role::AgentMarketeur,
             Role::Magasinier,
         ], true);
     }
@@ -34,18 +34,17 @@ class OrderPolicy
         return in_array($user->role, [
             Role::Admin,
             Role::Directeur,
-            Role::Commercial,
             Role::AgentMarketeur,
         ], true);
     }
 
     public function update(User $user, Order $order): bool
     {
-        if (in_array($user->role, [Role::Admin, Role::Directeur, Role::Commercial], true)) {
+        if (in_array($user->role, [Role::Admin, Role::Directeur, Role::AgentMarketeur], true)) {
             return true;
         }
 
-        return $order->user_id === $user->id && $order->statut === OrderStatus::EnAttente;
+        return $order->user_id === $user->id && $order->statut === OrderStatus::EnAttenteValidation;
     }
 
     /**
@@ -66,6 +65,37 @@ class OrderPolicy
     public function reject(User $user, Order $order): bool
     {
         return $this->validate($user, $order);
+    }
+
+    /**
+     * Create Goods Issue Note (Bon de Sortie) - réservé au Magasinier.
+     * Transition sécurisée : uniquement depuis Validee vers PretPourLivraison.
+     */
+    public function createGoodsIssueNote(User $user, Order $order): bool
+    {
+        if (! in_array($user->role, [Role::Magasinier, Role::Admin], true)) {
+            return false;
+        }
+
+        return $order->statut === OrderStatus::Validee;
+    }
+
+    /**
+     * Create Invoice - réservé à l'Agent Marketeur.
+     * Transition sécurisée : uniquement depuis PretPourLivraison vers LivreeEtFacturee.
+     */
+    public function createInvoice(User $user, Order $order): bool
+    {
+        if ($order->statut !== OrderStatus::PretPourLivraison) {
+            return false;
+        }
+
+        if ($user->role === Role::Admin) {
+            return true;
+        }
+
+        // Seul l'Agent Marketeur propriétaire de la commande peut livrer/facturer.
+        return $user->role === Role::AgentMarketeur && $order->user_id === $user->id;
     }
 
     public function delete(User $user, Order $order): bool

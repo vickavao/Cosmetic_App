@@ -14,7 +14,7 @@ return new class extends Migration
             $table->string('reference')->unique();
             $table->foreignId('client_id')->constrained('clients')->cascadeOnDelete();
             $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
-            $table->string('statut')->default(OrderStatus::EnAttente->value)->index();
+            $table->string('statut')->default(OrderStatus::EnAttenteValidation->value)->index();
             $table->decimal('total', 12, 2)->default(0);
             $table->date('date_commande');
             $table->text('notes')->nullable();

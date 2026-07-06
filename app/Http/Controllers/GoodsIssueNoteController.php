@@ -81,7 +81,7 @@ class GoodsIssueNoteController extends Controller
                 ]);
             }
 
-            $order->update(['statut' => OrderStatus::PreteALivraison]);
+            $order->update(['statut' => OrderStatus::PretPourLivraison]);
 
             return $note;
         });

@@ -97,6 +97,6 @@ class Order extends Model
      */
     public function scopeEnAttente(Builder $query): Builder
     {
-        return $query->where('statut', OrderStatus::EnAttente->value);
+        return $query->where('statut', OrderStatus::EnAttenteValidation->value);
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\OrderStatus;
+use App\Models\Announcement;
 use App\Models\Client;
 use App\Models\Invoice;
 use App\Models\Message;
@@ -33,9 +34,9 @@ class ClientPortalController extends Controller
             'en_cours' => (clone $baseQuery)->whereIn('statut', [
                 OrderStatus::Validee->value,
                 OrderStatus::EnPreparation->value,
-                OrderStatus::PreteALivraison->value,
+                OrderStatus::PretPourLivraison->value,
             ])->count(),
-            'livrees' => (clone $baseQuery)->where('statut', OrderStatus::Livree->value)->count(),
+            'livrees' => (clone $baseQuery)->where('statut', OrderStatus::LivreeEtFacturee->value)->count(),
             'factures_impayees' => (clone $invoiceQuery)->credit()->count(),
             'offres_actives' => Offer::query()->active()->count(),
         ];
@@ -194,6 +195,53 @@ class ClientPortalController extends Controller
             ->get();
 
         return view('portal.offers', ['offers' => $offers]);
+    }
+
+    /**
+     * News & events feed published by the Chef Marketing.
+     */
+    public function news(Request $request): View
+    {
+        $this->resolveClient($request);
+
+        $announcements = Announcement::query()
+            ->published()
+            ->with('author')
+            ->paginate(10);
+
+        return view('portal.news', ['announcements' => $announcements]);
+    }
+
+    /**
+     * Display the client's own profile edit form.
+     */
+    public function profile(Request $request): View
+    {
+        $client = $this->resolveClient($request);
+
+        return view('portal.profile', ['client' => $client]);
+    }
+
+    /**
+     * Update the client's personal information.
+     */
+    public function updateProfile(Request $request): RedirectResponse
+    {
+        $client = $this->resolveClient($request);
+
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['nullable', 'email', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:50'],
+            'address' => ['nullable', 'string', 'max:500'],
+            'ville' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $client->update($data);
+
+        return redirect()
+            ->route('portal.profile')
+            ->with('status', 'Profil mis à jour.');
     }
 
     /**

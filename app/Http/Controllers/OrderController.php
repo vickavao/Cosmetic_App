@@ -6,14 +6,18 @@ use App\Enums\OrderStatus;
 use App\Enums\Role;
 use App\Http\Requests\StoreOrderRequest;
 use App\Models\Client;
+use App\Models\GoodsIssueNote;
+use App\Models\Invoice;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\User;
+use App\Notifications\BonSortieEmis;
 use App\Notifications\CommandeSoumise;
 use App\Notifications\CommandeTraitee;
 use App\Notifications\CommandeValidee;
 use App\Notifications\StockInsuffisant;
 use App\Services\InventoryService;
+use App\Services\InvoiceService;
 use App\Services\OrderService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
@@ -61,23 +65,12 @@ class OrderController extends Controller
     {
         $data = $request->validated();
 
-        // Confirmation de rupture au panier : si un produit est indisponible et
-        // que l'agent n'a pas explicitement confirmé, on revient avec la liste.
-        $rupture = $this->orderService->checkAvailabilityForItems($data['items']);
-
-        if ($rupture !== [] && ! $request->boolean('confirm_rupture')) {
-            return back()
-                ->withInput()
-                ->with('rupture_confirmation', $rupture)
-                ->with('warning', 'Certains produits sont en rupture. Confirmez pour soumettre la commande malgré tout.');
-        }
-
         $order = DB::transaction(function () use ($data, $request): Order {
             $order = Order::create([
                 'reference' => 'CMD-'.strtoupper(Str::random(8)),
                 'client_id' => $data['client_id'],
                 'user_id' => $request->user()->id,
-                'statut' => OrderStatus::EnAttente,
+                'statut' => OrderStatus::EnAttenteValidation,
                 'type_vente' => $data['type_vente'],
                 'date_echeance' => $data['date_echeance'] ?? null,
                 'total' => 0,
@@ -115,25 +108,10 @@ class OrderController extends Controller
             return $order;
         });
 
-        // L'agent ayant confirmé, les produits en rupture restent dans la
-        // commande : on trace les alertes et on prévient la production.
-        if ($rupture !== []) {
-            $this->orderService->recordStockAlerts($order, $rupture, $request->user()->id);
-            $this->notifyStockManagers($order, $rupture);
-        }
-
         // Notifier le Chef Marketing (supervisor) de la soumission
         $chef = $order->user?->supervisor;
         if ($chef) {
             $chef->notify(new CommandeSoumise($order));
-        }
-
-        if ($rupture !== []) {
-            $noms = implode(', ', array_column($rupture, 'name'));
-
-            return redirect()
-                ->route('orders.show', $order)
-                ->with('warning', "Commande soumise au Chef Marketing avec produit(s) en rupture (production alertée) : {$noms}.");
         }
 
         return redirect()
@@ -177,7 +155,7 @@ class OrderController extends Controller
     {
         Gate::authorize('validate', $order);
 
-        if ($order->statut !== OrderStatus::EnAttente) {
+        if ($order->statut !== OrderStatus::EnAttenteValidation) {
             return back()->with('warning', 'Cette commande a déjà été traitée.');
         }
 
@@ -258,7 +236,7 @@ class OrderController extends Controller
     {
         Gate::authorize('reject', $order);
 
-        if ($order->statut !== OrderStatus::EnAttente) {
+        if ($order->statut !== OrderStatus::EnAttenteValidation) {
             return back()->with('warning', 'Cette commande a déjà été traitée.');
         }
 
@@ -285,12 +263,27 @@ class OrderController extends Controller
     }
 
     /**
+     * Dedicated page for the Magasinier: validated orders waiting for a
+     * Bon de Sortie (Étape 3). Listing the freshest validated orders first.
+     */
+    public function toPrepare(): View
+    {
+        $orders = Order::query()
+            ->where('statut', OrderStatus::Validee->value)
+            ->with(['client', 'user', 'items.product'])
+            ->latest('date_commande')
+            ->paginate(20);
+
+        return view('orders.to-prepare', ['orders' => $orders]);
+    }
+
+    /**
      * Dedicated page for Chef Marketing: all pending orders with filters.
      */
     public function pendingValidation(Request $request): View
     {
         $orders = Order::query()
-            ->enAttente()
+            ->where('statut', OrderStatus::EnAttenteValidation)
             ->when($request->filled('client_id'), fn ($q) => $q->where('client_id', $request->integer('client_id')))
             ->when($request->filled('agent_id'), fn ($q) => $q->where('user_id', $request->integer('agent_id')))
             ->when($request->filled('date_from'), fn ($q) => $q->whereDate('date_commande', '>=', $request->date('date_from')))
@@ -315,5 +308,109 @@ class OrderController extends Controller
         return redirect()
             ->route('orders.index')
             ->with('status', 'Commande supprimée.');
+    }
+
+    /**
+     * Create Goods Issue Note (Bon de Sortie) - Étape 3 du workflow sécurisé.
+     * Décrémente physiquement le stock (via InventoryService) et passe la
+     * commande à PretPourLivraison. Seul le Magasinier est autorisé.
+     */
+    public function createGoodsIssueNote(Order $order): RedirectResponse
+    {
+        Gate::authorize('createGoodsIssueNote', $order);
+
+        if ($order->statut !== OrderStatus::Validee) {
+            return back()->with('warning', 'Le Bon de Sortie ne peut être émis que pour une commande validée.');
+        }
+
+        $requestUser = request()->user();
+
+        DB::transaction(function () use ($order, $requestUser): void {
+            $order->loadMissing('items');
+
+            $goodsIssueNote = GoodsIssueNote::create([
+                'reference' => 'BS-'.strtoupper(Str::random(8)),
+                'order_id' => $order->id,
+                'issued_by' => $requestUser->id,
+                'date' => today(),
+            ]);
+
+            foreach ($order->items as $item) {
+                $product = Product::query()->find($item->product_id);
+
+                if ($product === null) {
+                    continue;
+                }
+
+                // Sortie physique : décrémente le stock réel et consomme la
+                // réservation correspondante, le tout journalisé.
+                $this->inventoryService->issue(
+                    $product,
+                    $item->quantite,
+                    $goodsIssueNote,
+                    $requestUser->id,
+                    'Bon de sortie '.$goodsIssueNote->reference,
+                );
+
+                $goodsIssueNote->lines()->create([
+                    'product_id' => $item->product_id,
+                    'quantite' => $item->quantite,
+                ]);
+            }
+
+            $order->update(['statut' => OrderStatus::PretPourLivraison]);
+
+            // Notifier l'Agent Marketeur de l'autorisation officielle de livrer.
+            if ($order->user) {
+                $order->user->notify(new BonSortieEmis($order));
+            }
+        });
+
+        return back()->with('status', 'Bon de Sortie émis. Stock décrémenté. Commande prête pour livraison.');
+    }
+
+    /**
+     * Create Invoice - Étape 4 du workflow sécurisé.
+     * Génère la facture en clonant les lignes de la commande validée puis passe
+     * la commande à LivreeEtFacturee. Seul l'Agent Marketeur est autorisé.
+     */
+    public function createInvoice(Order $order, InvoiceService $invoiceService): RedirectResponse
+    {
+        Gate::authorize('createInvoice', $order);
+
+        if ($order->statut !== OrderStatus::PretPourLivraison) {
+            return back()->with('warning', 'La facture ne peut être générée que pour une commande prête pour livraison.');
+        }
+
+        $requestUser = request()->user();
+
+        $invoice = DB::transaction(function () use ($order, $requestUser, $invoiceService): Invoice {
+            $order->loadMissing('items');
+
+            $items = $order->items
+                ->map(fn ($item): array => [
+                    'product_id' => $item->product_id,
+                    'quantite' => $item->quantite,
+                ])
+                ->all();
+
+            $invoice = $invoiceService->create(
+                $order->client_id,
+                $requestUser->id,
+                $order->type_vente,
+                $items,
+                $order->notes,
+                $order->id,
+                $order->date_echeance,
+            );
+
+            $order->update(['statut' => OrderStatus::LivreeEtFacturee]);
+
+            return $invoice;
+        });
+
+        return redirect()
+            ->route('invoices.show', $invoice)
+            ->with('status', 'Facture générée. Commande livrée et facturée.');
     }
 }

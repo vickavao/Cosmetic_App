@@ -4,6 +4,8 @@ namespace App\Http\Requests;
 
 use App\Enums\SaleType;
 use App\Models\Order;
+use App\Models\Product;
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rules\Enum;
 
@@ -29,6 +31,54 @@ class StoreOrderRequest extends FormRequest
             'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
             'items.*.quantite' => ['required', 'integer', 'min:1'],
         ];
+    }
+
+    /**
+     * Anti-surcommande : blocage dur si la quantité cumulée d'un produit
+     * dépasse son stock disponible réel (stock physique moins réservations).
+     */
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator): void {
+            $items = $this->input('items');
+
+            if (! is_array($items) || $items === []) {
+                return;
+            }
+
+            $grouped = [];
+            foreach ($items as $line) {
+                if (! isset($line['product_id'], $line['quantite'])) {
+                    continue;
+                }
+
+                $productId = (int) $line['product_id'];
+                $grouped[$productId] = ($grouped[$productId] ?? 0) + (int) $line['quantite'];
+            }
+
+            if ($grouped === []) {
+                return;
+            }
+
+            $products = Product::query()->whereIn('id', array_keys($grouped))->get()->keyBy('id');
+
+            foreach ($items as $index => $line) {
+                $productId = (int) ($line['product_id'] ?? 0);
+
+                if (! isset($grouped[$productId])) {
+                    continue;
+                }
+
+                $disponible = (int) ($products->get($productId)?->disponible ?? 0);
+
+                if ($grouped[$productId] > $disponible) {
+                    $validator->errors()->add(
+                        "items.{$index}.quantite",
+                        "Action impossible : Stock insuffisant (Disponible : {$disponible})",
+                    );
+                }
+            }
+        });
     }
 
     /**

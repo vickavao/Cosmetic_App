@@ -5,26 +5,26 @@
 
 @php
     $badge = fn (\App\Enums\OrderStatus $s) => match ($s) {
-        \App\Enums\OrderStatus::EnAttente => 'badge-orange',
+        \App\Enums\OrderStatus::EnAttenteValidation => 'badge-orange',
         \App\Enums\OrderStatus::Validee, \App\Enums\OrderStatus::EnPreparation => 'badge-indigo',
-        \App\Enums\OrderStatus::PreteALivraison => 'badge-indigo',
-        \App\Enums\OrderStatus::Livree => 'badge-green',
+        \App\Enums\OrderStatus::PretPourLivraison => 'badge-indigo',
+        \App\Enums\OrderStatus::LivreeEtFacturee => 'badge-green',
         \App\Enums\OrderStatus::Refusee, \App\Enums\OrderStatus::Annulee => 'badge-red',
     };
 
     $doneStatuses = [
-        \App\Enums\OrderStatus::EnAttente,
+        \App\Enums\OrderStatus::EnAttenteValidation,
         \App\Enums\OrderStatus::Validee,
-        \App\Enums\OrderStatus::PreteALivraison,
+        \App\Enums\OrderStatus::PretPourLivraison,
         \App\Enums\OrderStatus::EnPreparation,
-        \App\Enums\OrderStatus::Livree,
+        \App\Enums\OrderStatus::LivreeEtFacturee,
     ];
 
     $steps = [
         ['key' => 'commande', 'label' => 'Étape 1 : Commande', 'done' => true],
-        ['key' => 'validee', 'label' => 'Étape 2 : Validation', 'done' => in_array($order->statut, [\App\Enums\OrderStatus::Validee, \App\Enums\OrderStatus::PreteALivraison, \App\Enums\OrderStatus::Livree])],
-        ['key' => 'bon_sortie', 'label' => 'Étape 3 : Bon de Sortie', 'done' => in_array($order->statut, [\App\Enums\OrderStatus::PreteALivraison, \App\Enums\OrderStatus::Livree])],
-        ['key' => 'livree', 'label' => 'Étape 4 : Livrée', 'done' => $order->statut === \App\Enums\OrderStatus::Livree],
+        ['key' => 'validee', 'label' => 'Étape 2 : Validation', 'done' => in_array($order->statut, [\App\Enums\OrderStatus::Validee, \App\Enums\OrderStatus::PretPourLivraison, \App\Enums\OrderStatus::LivreeEtFacturee])],
+        ['key' => 'bon_sortie', 'label' => 'Étape 3 : Bon de Sortie', 'done' => in_array($order->statut, [\App\Enums\OrderStatus::PretPourLivraison, \App\Enums\OrderStatus::LivreeEtFacturee])],
+        ['key' => 'livree', 'label' => 'Étape 4 : Livrée et facturée', 'done' => $order->statut === \App\Enums\OrderStatus::LivreeEtFacturee],
     ];
     if (in_array($order->statut, [\App\Enums\OrderStatus::Annulee, \App\Enums\OrderStatus::Refusee])) {
         $steps = [
@@ -151,7 +151,8 @@
             </table>
         </div>
 
-        @if ($order->statut === \App\Enums\OrderStatus::EnAttente)
+        {{-- Étape 2 : Validation / Refus (Chef Marketing) --}}
+        @if ($order->statut === \App\Enums\OrderStatus::EnAttenteValidation)
             <div class="flex flex-col items-end gap-3" x-data="{ rejecting: false }">
                 <div class="flex justify-end gap-3">
                     @can('reject', $order)
@@ -179,5 +180,27 @@
                 @endcan
             </div>
         @endif
+
+        {{-- Étape 3 : Bon de Sortie (Magasinier) --}}
+        @can('createGoodsIssueNote', $order)
+            <div class="flex justify-end">
+                <form method="POST" action="{{ route('orders.goods-issue-note', $order) }}"
+                      onsubmit="return confirm('Émettre le Bon de Sortie ? Le stock physique sera décrémenté.');">
+                    @csrf
+                    <button class="btn-primary">Émettre le Bon de Sortie</button>
+                </form>
+            </div>
+        @endcan
+
+        {{-- Étape 4 : Facturation 1-click (Agent Marketeur) --}}
+        @can('createInvoice', $order)
+            <div class="flex justify-end">
+                <form method="POST" action="{{ route('orders.invoice', $order) }}"
+                      onsubmit="return confirm('Générer la facture et clôturer la commande ?');">
+                    @csrf
+                    <button class="btn-primary">Livrer et générer la facture</button>
+                </form>
+            </div>
+        @endcan
     </div>
 </x-app-layout>

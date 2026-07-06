@@ -1,9 +1,9 @@
 @php
     $badge = fn (\App\Enums\OrderStatus $s) => match ($s) {
-        \App\Enums\OrderStatus::EnAttente => 'badge-orange',
+        \App\Enums\OrderStatus::EnAttenteValidation => 'badge-orange',
         \App\Enums\OrderStatus::Validee, \App\Enums\OrderStatus::EnPreparation => 'badge-indigo',
-        \App\Enums\OrderStatus::PreteALivraison => 'badge-blue',
-        \App\Enums\OrderStatus::Livree => 'badge-green',
+        \App\Enums\OrderStatus::PretPourLivraison => 'badge-blue',
+        \App\Enums\OrderStatus::LivreeEtFacturee => 'badge-green',
         \App\Enums\OrderStatus::Refusee, \App\Enums\OrderStatus::Annulee => 'badge-red',
     };
 @endphp
@@ -40,6 +40,40 @@
             'icon' => '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
         ])
     </div>
+
+    {{-- Étape 4 : Commandes prêtes à livrer (Bon de Sortie émis par le Magasinier) --}}
+    @if (($ordersToDeliver ?? collect())->isNotEmpty())
+        <div class="rounded-xl border border-blue-200 bg-blue-50 overflow-hidden">
+            <div class="px-6 py-4 border-b border-blue-200 flex items-center gap-2">
+                <svg class="text-blue-600" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 18H3c-.6 0-1-.4-1-1V7c0-.6.4-1 1-1h10c.6 0 1 .4 1 1v11"/><path d="M14 9h4l4 4v4c0 .6-.4 1-1 1h-2"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg>
+                <h2 class="text-base font-semibold text-blue-800">À livrer et facturer</h2>
+                <span class="badge badge-blue ml-auto">{{ $ordersToDeliver->count() }}</span>
+            </div>
+            <div class="divide-y divide-blue-100">
+                @foreach ($ordersToDeliver as $order)
+                    <div class="flex items-center justify-between px-6 py-4 bg-white/60">
+                        <div>
+                            <p class="text-sm font-medium text-gray-900">{{ $order->reference }} — {{ $order->client?->name }}</p>
+                            <p class="text-xs text-gray-500">
+                                {{ $order->items->count() }} produit(s) · {{ $order->items->sum('quantite') }} unité(s) ·
+                                Bon de Sortie émis · @money((float) $order->total)
+                            </p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <a href="{{ route('orders.show', $order) }}" class="btn-secondary !py-1.5 !px-3 text-xs">Détails</a>
+                            @can('createInvoice', $order)
+                                <form method="POST" action="{{ route('orders.invoice', $order) }}"
+                                      onsubmit="return confirm('Générer la facture et clôturer la livraison ?');">
+                                    @csrf
+                                    <button class="btn-primary !py-1.5 !px-3 text-xs">Livrer et générer la facture</button>
+                                </form>
+                            @endcan
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    @endif
 
     <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
         <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">

@@ -25,7 +25,7 @@ function makeOrderWithItem(Product $product, int $quantite): Order
         'reference' => 'CMD-TEST-'.uniqid(),
         'client_id' => $client->id,
         'user_id' => $user->id,
-        'statut' => OrderStatus::EnAttente,
+        'statut' => OrderStatus::EnAttenteValidation,
         'total' => $product->price * $quantite,
         'date_commande' => today(),
     ]);

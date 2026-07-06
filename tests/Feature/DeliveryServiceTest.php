@@ -50,7 +50,7 @@ it('creates a prepared delivery from a validated order', function () {
 
     expect($delivery->statut)->toBe(DeliveryStatus::Prepare);
     expect($delivery->lines)->toHaveCount(1);
-    expect($order->refresh()->statut)->toBe(OrderStatus::Livree);
+    expect($order->refresh()->statut)->toBe(OrderStatus::LivreeEtFacturee);
 });
 
 it('confirming a delivery issues physical stock and generates a goods issue note', function () {
@@ -65,7 +65,7 @@ it('confirming a delivery issues physical stock and generates a goods issue note
     expect($product->stock)->toBe(40);
     expect($product->stock_reserved)->toBe(0);
     expect($delivery->refresh()->statut)->toBe(DeliveryStatus::Livre);
-    expect($order->refresh()->statut)->toBe(OrderStatus::Livree);
+    expect($order->refresh()->statut)->toBe(OrderStatus::LivreeEtFacturee);
 
     assertDatabaseHas('goods_issue_notes', ['id' => $note->id, 'delivery_id' => $delivery->id]);
     assertDatabaseHas('goods_issue_lines', ['goods_issue_note_id' => $note->id, 'product_id' => $product->id, 'quantite' => 10]);
